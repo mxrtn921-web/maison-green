@@ -21,7 +21,7 @@ export function homePage(ctx, { categories, featured, zones, hours, state, shelf
       <div class="hero-meta">
         <span>${icon('clock')}${state.accepting ? html`Prochain créneau : ${state.nextSlot.dayLabel.toLowerCase()}, ${state.nextSlot.label}` : 'Commandes momentanément fermées'}</span>
         <span>${icon('bike')}Livraison dès ${money(minFee)}</span>
-        <span>${icon('cash')}Carte ou espèces</span>
+        <span>${icon('card')}Paiement par carte</span>
       </div>
     </div>
     <div class="shelf" aria-hidden="true">
@@ -103,7 +103,7 @@ export function homePage(ctx, { categories, featured, zones, hours, state, shelf
     <div class="perks">
       <div class="perk"><div class="rule"></div><h3>Choisi au comptoir</h3><p>Pas d'entrepôt : chaque produit vient de nos rayons, sélectionné auprès de producteurs et de maisons que nous connaissons.</p></div>
       <div class="perk"><div class="rule"></div><h3>Livré par nous</h3><p>Nos livreurs sont de l'équipe. Ils connaissent le quartier, les digicodes et le troisième étage sans ascenseur.</p></div>
-      <div class="perk"><div class="rule"></div><h3>Payez comme vous voulez</h3><p>Carte bancaire sécurisée par Stripe, ou espèces à la livraison. Aucun abonnement, aucun frais caché.</p></div>
+      <div class="perk"><div class="rule"></div><h3>Paiement sécurisé</h3><p>Réglez par carte bancaire, en toute sécurité grâce à Stripe. Aucun abonnement, aucun frais caché.</p></div>
       <div class="perk"><div class="rule"></div><h3>Un vrai service de quartier</h3><p>Un produit manquant, une question ? On vous appelle avant de livrer. Et on reprend ce qui ne va pas.</p></div>
     </div>
   </div>

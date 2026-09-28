@@ -50,9 +50,18 @@ const firstSlot = async (c) => {
 };
 const checkout = (slot, extra = {}) => ({
   first_name: 'Test', last_name: 'Client', email: 'test@exemple.fr', phone: '06 12 34 56 78', address_line1: '10 rue Jeanne d’Arc',
-  postal_code: '76000', city: 'Rouen', instructions: 'Code 1234', slot, payment_method: 'cash', accept_terms: true,
+  postal_code: '76000', city: 'Rouen', instructions: 'Code 1234', slot, payment_method: 'card', accept_terms: true,
   items: [{ id: 1, qty: 3 }, { id: 21, qty: 2 }], ...extra,
 });
+// Commande payée par carte (mode démo) : renvoie le jeton de suivi.
+const placePaidOrder = async (c, extra = {}) => {
+  const r = await c.post('/api/orders', { json: checkout(await firstSlot(c), extra) });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  assert.match(r.data.redirect, /paiement-demo/);
+  const token = r.data.redirect.split('/').pop();
+  await c.post(`/paiement-demo/${token}`, { form: { result: 'success' } });
+  return token;
+};
 const productStock = async (admin, id) => Number(/name="stock" type="number" min="0" value="(\d+)"/.exec((await admin.get(`/admin/produits/${id}`)).text)[1]);
 
 test('pages publiques accessibles', async () => {
@@ -77,21 +86,24 @@ test('validation de commande : erreurs lisibles par champ', async () => {
   assert.ok(r.data.errors.first_name && r.data.errors.phone && r.data.errors.postal_code && r.data.errors.accept_terms);
 });
 
-test('parcours complet espèces : client → admin → livreur → livrée', async () => {
+test('parcours complet carte : client → livreur → livrée, sans espèces', async () => {
   const c = client(); const admin = client(); const driver = client();
   await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
   await driver.login('lucas@maisongreen.fr', 'Livreur-2026');
   const stockBefore = await productStock(admin, 1);
-  const slot = await firstSlot(c);
-  const r = await c.post('/api/orders', { json: checkout(slot) });
-  assert.equal(r.status, 201, JSON.stringify(r.data));
-  const token = r.data.redirect.split('/').pop();
+  // les espèces ne sont plus proposées ni acceptées
+  const co = (await c.get('/commande')).text;
+  assert.doesNotMatch(co, /value="cash"/); assert.doesNotMatch(co, /Espèces/);
+  const refused = await c.post('/api/orders', { json: checkout(await firstSlot(c), { payment_method: 'cash' }) });
+  assert.equal(refused.status, 422);
+  assert.ok(refused.data.errors.payment_method);
+  const token = await placePaidOrder(c);
   assert.equal(await productStock(admin, 1), stockBefore - 3, 'stock décrémenté');
 
   const track = await c.get(`/suivi/${token}`);
   const number = /Commande (MG-\d+)/.exec(track.text)[1];
   const id = Number(number.slice(3)) - 1000;
-  assert.match(track.text, /Commande reçue/);
+  assert.doesNotMatch(track.text, /espèces/i);
 
   // confirmée automatiquement : aucune action de la boutique, la course est proposée aux livreurs
   assert.match((await c.get(`/suivi/${token}`)).text, /Commande confirmée/);
@@ -108,8 +120,8 @@ test('parcours complet espèces : client → admin → livreur → livrée', asy
   assert.equal((await driver.get(`/livreur/courses/${id}`)).status, 200);
   assert.equal((await driver.get(`/livreur/courses/${id}/accept`)).location, `/livreur/courses/${id}`);
   // formulaire « Accepter » de la page : retour sur la course (200), pas d'erreur
-  const other = await c.post('/api/orders', { json: checkout(await firstSlot(c)) });
-  const otherId = Number((await c.get(other.data.redirect)).text.match(/MG-(\d+)/)[1]) - 1000;
+  const otherToken = await placePaidOrder(c);
+  const otherId = Number((await c.get(`/suivi/${otherToken}`)).text.match(/MG-(\d+)/)[1]) - 1000;
   const acc2 = await driver.post(`/livreur/courses/${otherId}/accept`, { form: {} });
   assert.equal(acc2.location, `/livreur/courses/${otherId}`);
   assert.equal((await driver.get(acc2.location)).status, 200);
@@ -117,15 +129,11 @@ test('parcours complet espèces : client → admin → livreur → livrée', asy
   assert.equal((await driver.get('/livreur/courses/999999')).location, '/livreur');
   await admin.post(`/admin/commandes/${otherId}/statut`, { form: { status: 'cancelled', reason: 'Test' } });
   const run = (await driver.get(`/livreur/courses/${id}`)).text;
-  assert.match(run, /À encaisser/);
+  assert.doesNotMatch(run, /À encaisser/); assert.match(run, /payée par carte/);
   assert.match(run, /google\.com\/maps/); assert.match(run, /maps\.apple\.com/);
   for (const a of ['pickup', 'start', 'deliver']) assert.equal((await driver.post(`/livreur/courses/${id}/${a}`)).status, 303);
   const done = (await c.get(`/suivi/${token}`)).text;
   assert.match(done, /Livrée/);
-  // espèces : détenues par le livreur puis remises en caisse
-  const driverId = /\/admin\/livreurs\/(\d+)\/especes/.exec((await admin.get('/admin/livreurs')).text)[1];
-  await admin.post(`/admin/livreurs/${driverId}/especes`);
-  assert.match((await admin.get(`/admin/commandes/${id}`)).text, /Espèces remises/);
 });
 
 test('paiement carte (démo) : échec, nouvel essai, succès, remboursement', async () => {
@@ -334,6 +342,7 @@ test('alertes push livreur (VAPID signé) et sauvegarde de la base', async () =>
     const r = await c.post('/api/orders', { json: checkout(await firstSlot(c), { items: [{ id, qty: 15 }] }) });
     assert.equal(r.status, 201, JSON.stringify(r.data));
     const orderId = Number((await c.get(r.data.redirect)).text.match(/MG-(\d+)/)[1]) - 1000;
+    await c.post(r.data.redirect, { form: { result: 'success' } }); // paiement carte (démo)
     // aucune confirmation manuelle : l'alerte part dès la commande
     for (let i = 0; i < 40 && !hits.length; i++) await new Promise((w) => setTimeout(w, 50));
     assert.equal(hits.length, 1, 'une alerte push envoyée au livreur');

@@ -263,9 +263,8 @@
       <div class="grand"><span>Total</span><span class="price">${money(total)}</span></div>
       ${missing ? `<div class="notice notice-warn mt-8" style="font-size:13px">${ICON.alert}<span>Minimum de commande pour cette zone : ${money(quote.zone.min)}. Il manque ${money(missing)}.</span></div>` : ''}`;
     const peek = $('[data-sum-peek]'); if (peek) peek.textContent = `${count()} article${count() > 1 ? 's' : ''} · ${money(total)}`;
-    const pm = co?.payment_method?.value;
     const label = $('[data-submit-label]');
-    if (label) label.textContent = pm === 'cash' ? `Valider la commande · ${money(total)}` : `Payer ${money(total)}`;
+    if (label) label.textContent = `Payer ${money(total)}`;
   }
   if (co) {
     const data = JSON.parse($('#checkout-data').textContent);

@@ -68,7 +68,7 @@ ${flashBox(ctx.flash)}
     </div>
     <div class="footer-bottom">
       <span>© ${new Date().getFullYear()} Maison Green · Rouen</span>
-      <span>Paiement sécurisé par Stripe · Espèces à la livraison</span>
+      <span>Paiement sécurisé par carte bancaire (Stripe)</span>
     </div>
   </div>
 </footer>

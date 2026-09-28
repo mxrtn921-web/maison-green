@@ -25,7 +25,7 @@ export function dashboardPage(ctx, s) {
     <div class="kpi accent"><span class="k-label">Chiffre d'affaires du jour</span><span class="k-value">${money(s.today.revenue)}</span><span class="k-sub">${s.today.count} commande${s.today.count > 1 ? 's' : ''} · panier moyen ${money(s.today.count ? Math.round(s.today.revenue / s.today.count) : 0)}</span></div>
     <a class="kpi" href="/admin/commandes?vue=en-cours"><span class="k-label">En cours</span><span class="k-value">${s.active}</span><span class="k-sub">${s.toConfirm} à confirmer</span></a>
     <a class="kpi" href="/admin/commandes?vue=livrees"><span class="k-label">Livrées aujourd'hui</span><span class="k-value">${s.deliveredToday}</span><span class="k-sub">${s.cancelled30} annulée${s.cancelled30 > 1 ? 's' : ''} sur 30 jours</span></a>
-    <a class="kpi cash" href="/admin/commandes?vue=especes"><span class="k-label">Espèces à récupérer</span><span class="k-value">${money(s.cashDue + s.cashHeld)}</span><span class="k-sub">${money(s.cashDue)} à encaisser · ${money(s.cashHeld)} chez les livreurs</span></a>
+    ${s.cashDue + s.cashHeld ? html`<a class="kpi cash" href="/admin/commandes?vue=especes"><span class="k-label">Espèces à récupérer</span><span class="k-value">${money(s.cashDue + s.cashHeld)}</span><span class="k-sub">${money(s.cashDue)} à encaisser · ${money(s.cashHeld)} chez les livreurs</span></a>` : ''}
   </div>
 
   <div class="dash-grid">
@@ -54,7 +54,7 @@ export function dashboardPage(ctx, s) {
         <div class="panel-body">
           <dl class="kv">
             <dt>Carte bancaire</dt><dd class="num"><strong>${money(s.pay.card)}</strong> <span class="muted small">· ${s.pay.cardCount} paiements</span></dd>
-            <dt>Espèces</dt><dd class="num"><strong>${money(s.pay.cash)}</strong> <span class="muted small">· ${s.pay.cashCount} livraisons</span></dd>
+            ${s.pay.cash ? html`<dt>Espèces (anciennes commandes)</dt><dd class="num"><strong>${money(s.pay.cash)}</strong> <span class="muted small">· ${s.pay.cashCount} livraisons</span></dd>` : ''}
             <dt>Remboursé</dt><dd class="num">${money(s.pay.refunded)}</dd>
             <dt>Échecs</dt><dd class="num">${s.pay.failed} paiement${s.pay.failed > 1 ? 's' : ''} refusé${s.pay.failed > 1 ? 's' : ''}</dd>
           </dl>
@@ -96,7 +96,8 @@ export function ordersTable(orders, { compact = false } = {}) {
 // ——— Commandes ————————————————————————————————————————————————
 
 export function ordersPage(ctx, { orders, view, q, counts }) {
-  const views = [['en-cours', 'En cours'], ['aujourdhui', "Aujourd'hui"], ['especes', 'Espèces'], ['livrees', 'Livrées'], ['annulees', 'Annulées'], ['paiement', 'Paiement en attente'], ['toutes', 'Toutes']];
+  const views = [['en-cours', 'En cours'], ['aujourdhui', "Aujourd'hui"], ['especes', 'Espèces'], ['livrees', 'Livrées'], ['annulees', 'Annulées'], ['paiement', 'Paiement en attente'], ['toutes', 'Toutes']]
+    .filter(([k]) => k !== 'especes' || counts.especes || view === 'especes');
   const body = html`
   <div class="pro-head"><div><h1 class="h1">Commandes</h1><p>Mises à jour en direct. Cliquez sur une commande pour la traiter.</p></div></div>
   <div class="filters">

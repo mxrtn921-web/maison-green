@@ -43,10 +43,9 @@ export function trackPage(ctx, { order: o, items, events, justPaid, paymentCance
 
       ${o.status === 'awaiting_payment' ? html`
         <div class="panel mt-24"><div class="panel-body stack" style="--s:12px">
-          ${o.payment_status === 'failed' ? html`<div class="notice notice-error">${icon('alert')}<span>Le paiement a été refusé. Vous pouvez réessayer avec une autre carte, ou choisir les espèces.</span></div>` : ''}
+          ${o.payment_status === 'failed' ? html`<div class="notice notice-error">${icon('alert')}<span>Le paiement a été refusé. Vous pouvez réessayer avec la même carte ou une autre.</span></div>` : ''}
           <div class="row wrap-row">
             <form method="post" action="/suivi/${o.tracking_token}/payer"><button class="btn btn-primary">${icon('card')} Payer ${money(o.total_cents)}</button></form>
-            <form method="post" action="/suivi/${o.tracking_token}/especes"><button class="btn btn-ghost">Payer en espèces à la livraison</button></form>
           </div>
         </div></div>` : ''}
 

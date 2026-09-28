@@ -67,7 +67,7 @@ const checkoutSchema = {
   city: v.text({ label: 'La ville', max: 80 }),
   instructions: v.longText({ label: 'Les instructions', max: 300 }),
   slot: v.text({ label: 'Le créneau', max: 20 }),
-  payment_method: v.oneOf(['card', 'cash'], 'Choisissez un mode de paiement.'),
+  payment_method: v.oneOf(['card'], 'Le paiement se fait uniquement par carte bancaire.'),
   accept_terms: v.bool(),
   save_address: v.bool(),
 };
@@ -79,7 +79,6 @@ const checkoutSchema = {
 export function createOrder(input, user) {
   const { data, errors } = validate(checkoutSchema, input);
   if (!data.accept_terms) errors.accept_terms = 'Merci d’accepter les conditions générales de vente.';
-  if (data.payment_method === 'cash' && !input.allow_cash_ok) { /* toujours autorisé ; hook pour limiter plus tard */ }
 
   const state = orderingState();
   if (!state.accepting) throw new HttpError(422, state.message || 'Les commandes sont fermées.', { errors });
@@ -102,7 +101,6 @@ export function createOrder(input, user) {
 
   const fee = deliveryFee(zone, quote.subtotal);
   const total = quote.subtotal + fee;
-  const isCash = data.payment_method === 'cash';
   const token = crypto.randomBytes(18).toString('base64url');
 
   const order = tx(() => {
@@ -114,22 +112,17 @@ export function createOrder(input, user) {
     const r = run(`INSERT INTO orders (number, tracking_token, user_id, status, first_name, last_name, email, phone, address_line1, address_line2,
                      postal_code, city, instructions, zone_id, zone_name, slot_date, slot_start, slot_end, subtotal_cents, delivery_fee_cents,
                      total_cents, payment_method, payment_status, cash_to_collect_cents)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      `TMP-${token}`, token, user?.id ?? null, isCash ? 'received' : 'awaiting_payment', data.first_name, data.last_name, data.email, data.phone,
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending', 0)`,
+      `TMP-${token}`, token, user?.id ?? null, 'awaiting_payment', data.first_name, data.last_name, data.email, data.phone,
       data.address_line1, data.address_line2, data.postal_code, data.city, data.instructions, zone.id, zone.name, slot.date, slot.start, slot.end,
-      quote.subtotal, fee, total, data.payment_method, isCash ? 'due_on_delivery' : 'pending', isCash ? total : 0);
+      quote.subtotal, fee, total);
     const id = Number(r.lastInsertRowid);
     run('UPDATE orders SET number = ? WHERE id = ?', `MG-${1000 + id}`, id);
     for (const l of quote.lines) {
       run('INSERT INTO order_items (order_id, product_id, name, unit, unit_price_cents, quantity, line_total_cents) VALUES (?, ?, ?, ?, ?, ?, ?)',
         id, l.id, l.name, l.unit, l.unit_price_cents, l.quantity, l.line_total_cents);
     }
-    if (isCash) {
-      run("INSERT INTO payments (order_id, provider, status, amount_cents) VALUES (?, 'cash', 'due_on_delivery', ?)", id, total);
-      addEvent(id, 'received', 'Commande reçue — paiement en espèces à la livraison');
-    } else {
-      addEvent(id, 'awaiting_payment', 'En attente du paiement par carte');
-    }
+    addEvent(id, 'awaiting_payment', 'En attente du paiement par carte');
     if (user && data.save_address) {
       const exists = one('SELECT id FROM addresses WHERE user_id = ? AND line1 = ? AND postal_code = ?', user.id, data.address_line1, data.postal_code);
       if (!exists) {
@@ -142,7 +135,6 @@ export function createOrder(input, user) {
     return getOrder(id);
   });
 
-  if (isCash) onOrderPlaced(order);
   return { order, items: orderItems(order.id) };
 }
 
@@ -199,21 +191,6 @@ export function markPaymentFailed(orderId, message = 'Paiement refusé') {
   run("UPDATE payments SET status = 'failed', failure_message = ?, updated_at = ? WHERE order_id = ? AND status = 'pending'", message, nowIso(), orderId);
   addEvent(orderId, 'awaiting_payment', `Échec du paiement : ${message}`);
   publish(`order:${o.tracking_token}`, 'status', { status: o.status });
-}
-
-/** Le client abandonne la carte et choisit les espèces (commande encore en attente de paiement). */
-export function switchToCash(orderId) {
-  const o = getOrder(orderId);
-  if (!o || o.status !== 'awaiting_payment') throw new HttpError(409, 'Cette commande ne peut plus changer de mode de paiement.');
-  const updated = tx(() => {
-    run("UPDATE orders SET payment_method = 'cash', payment_status = 'due_on_delivery', cash_to_collect_cents = total_cents, status = 'received', updated_at = ? WHERE id = ?", nowIso(), orderId);
-    run("UPDATE payments SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status IN ('pending','failed')", nowIso(), orderId);
-    run("INSERT INTO payments (order_id, provider, status, amount_cents) VALUES (?, 'cash', 'due_on_delivery', ?)", orderId, o.total_cents);
-    addEvent(orderId, 'received', 'Commande reçue — paiement en espèces à la livraison');
-    return getOrder(orderId);
-  });
-  onOrderPlaced(updated);
-  return updated;
 }
 
 /** Annule les commandes carte jamais payées (panier abandonné sur Stripe) et libère le stock. */

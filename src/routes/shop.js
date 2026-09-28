@@ -5,7 +5,7 @@ import { subscribe } from '../lib/events.js';
 import { all } from '../db.js';
 import { categories, shopProducts, featuredProducts, productBySlug, quoteCart } from '../services/catalog.js';
 import { zones, zoneForPostal, deliveryFee, availableSlots, orderingState, hoursSummary } from '../services/delivery.js';
-import { createOrder, getOrderByToken, orderItems, orderEvents, markPaid, markPaymentFailed, switchToCash } from '../services/orders.js';
+import { createOrder, getOrderByToken, orderItems, orderEvents, markPaid, markPaymentFailed } from '../services/orders.js';
 import { startCheckout, confirmCheckoutSession, verifyWebhook, handleWebhookEvent } from '../services/payments.js';
 import { homePage } from '../views/shop/home.js';
 import { catalogPage, productPage } from '../views/shop/catalog.js';
@@ -64,7 +64,6 @@ get('/api/zone', (ctx) => {
 post('/api/orders', async (ctx) => {
   try {
     const { order } = createOrder(ctx.body, ctx.user?.role === 'customer' ? ctx.user : null);
-    if (order.payment_method === 'cash') return sendJson(ctx.res, { redirect: `/suivi/${order.tracking_token}` }, 201);
     try {
       const url = await startCheckout(order, ctx.user?.role === 'customer' ? ctx.user : null);
       return sendJson(ctx.res, { redirect: url }, 201);
@@ -96,8 +95,7 @@ post('/suivi/:token/payer', async (ctx) => {
 post('/suivi/:token/especes', (ctx) => {
   const o = getOrderByToken(ctx.params.token);
   if (!o) throw new HttpError(404);
-  switchToCash(o.id);
-  setFlash(ctx.res, 'success', 'C’est noté : vous réglerez en espèces à la livraison.');
+  setFlash(ctx.res, 'error', 'Le paiement se fait uniquement par carte bancaire.');
   redirect(ctx.res, `/suivi/${o.tracking_token}`);
 });
 
