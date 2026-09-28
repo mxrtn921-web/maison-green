@@ -1,0 +1,10 @@
+{
+  "name": "Maison Green — Boutique",
+  "short_name": "MG Boutique",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1E3B2F",
+  "icons": [{ "src": "/img/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

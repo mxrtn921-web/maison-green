@@ -1,0 +1,358 @@
+// Tests de bout en bout (serveur réel, base temporaire). Lancer : npm test
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+
+const PORT = 3900 + Math.floor(Math.random() * 90);
+const BASE = `http://localhost:${PORT}`;
+const DB = path.join(os.tmpdir(), `mg-test-${Date.now()}.db`);
+const WEBHOOK_SECRET = 'whsec_test_123';
+let server;
+
+before(async () => {
+  server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server.js'], {
+    cwd: path.resolve(import.meta.dirname, '..'),
+    env: { ...process.env, PORT: String(PORT), DATABASE_FILE: DB, BASE_URL: BASE, STRIPE_SECRET_KEY: '', STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET, RESEND_API_KEY: '' },
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  await new Promise((resolve) => server.stdout.on('data', (d) => { if (String(d).includes('en ligne')) resolve(); }));
+});
+after(() => { server.kill(); for (const f of [DB, `${DB}-wal`, `${DB}-shm`]) fs.rmSync(f, { force: true }); });
+
+/** Petit client HTTP avec cookies (comme un navigateur). */
+function client() {
+  const jar = new Map();
+  const req = async (method, url, { form, json, multipart, headers = {} } = {}) => {
+    const h = { Origin: BASE, Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...headers };
+    let body;
+    if (form) { h['Content-Type'] = 'application/x-www-form-urlencoded'; body = new URLSearchParams(form).toString(); }
+    if (json) { h['Content-Type'] = 'application/json'; body = JSON.stringify(json); }
+    if (multipart) body = multipart;
+    const r = await fetch(BASE + url, { method, headers: h, body, redirect: 'manual' });
+    for (const c of r.headers.getSetCookie()) { const [kv] = c.split(';'); const [k, ...v] = kv.split('='); jar.set(k, v.join('=')); }
+    const text = await r.text();
+    let data = null; try { data = JSON.parse(text); } catch { /* HTML */ }
+    return { status: r.status, location: r.headers.get('location'), text, data };
+  };
+  return {
+    get: (u, o) => req('GET', u, o), post: (u, o) => req('POST', u, o),
+    login: async (email, password) => { const r = await req('POST', '/connexion', { form: { email, password } }); assert.equal(r.status, 303, 'connexion refusée'); return r; },
+  };
+}
+
+const firstSlot = async (c) => {
+  const html = (await c.get('/commande')).text;
+  return /name="slot" id="[^"]+" value="([^"]+)" >/.exec(html)?.[1] || /value="(\d{4}-\d{2}-\d{2}\|\d{2}:\d{2})"/.exec(html)[1];
+};
+const checkout = (slot, extra = {}) => ({
+  first_name: 'Test', last_name: 'Client', email: 'test@exemple.fr', phone: '06 12 34 56 78', address_line1: '10 rue Jeanne d’Arc',
+  postal_code: '76000', city: 'Rouen', instructions: 'Code 1234', slot, payment_method: 'cash', accept_terms: true,
+  items: [{ id: 1, qty: 3 }, { id: 21, qty: 2 }], ...extra,
+});
+const productStock = async (admin, id) => Number(/name="stock" type="number" min="0" value="(\d+)"/.exec((await admin.get(`/admin/produits/${id}`)).text)[1]);
+
+test('pages publiques accessibles', async () => {
+  const c = client();
+  for (const u of ['/', '/boutique', '/boutique?q=cidre', '/produit/cidre-brut-fermier', '/commande', '/cgv', '/confidentialite', '/mentions-legales', '/connexion']) {
+    assert.equal((await c.get(u)).status, 200, u);
+  }
+  assert.equal((await c.get('/nexiste-pas')).status, 404);
+});
+
+test('les prix du panier sont recalculés par le serveur', async () => {
+  const r = await client().post('/api/cart/quote', { json: { items: [{ id: 1, qty: 2, price: 1 }], postal_code: '76000' } });
+  assert.equal(r.data.lines[0].unit_price_cents, 340);
+  assert.equal(r.data.subtotal, 680);
+  assert.equal(r.data.zone.fee, 299);
+});
+
+test('validation de commande : erreurs lisibles par champ', async () => {
+  const c = client();
+  const r = await c.post('/api/orders', { json: { items: [{ id: 1, qty: 1 }], postal_code: '99999', phone: '12' } });
+  assert.equal(r.status, 422);
+  assert.ok(r.data.errors.first_name && r.data.errors.phone && r.data.errors.postal_code && r.data.errors.accept_terms);
+});
+
+test('parcours complet espèces : client → admin → livreur → livrée', async () => {
+  const c = client(); const admin = client(); const driver = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  await driver.login('lucas@maisongreen.fr', 'Livreur-2026');
+  const stockBefore = await productStock(admin, 1);
+  const slot = await firstSlot(c);
+  const r = await c.post('/api/orders', { json: checkout(slot) });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const token = r.data.redirect.split('/').pop();
+  assert.equal(await productStock(admin, 1), stockBefore - 3, 'stock décrémenté');
+
+  const track = await c.get(`/suivi/${token}`);
+  const number = /Commande (MG-\d+)/.exec(track.text)[1];
+  const id = Number(number.slice(3)) - 1000;
+  assert.match(track.text, /Commande reçue/);
+
+  for (const s of ['confirmed', 'preparing']) assert.equal((await admin.post(`/admin/commandes/${id}/statut`, { form: { status: s } })).status, 303);
+  // le livreur accepte lui-même la course
+  assert.match((await driver.get('/livreur?onglet=disponibles')).text, new RegExp(number));
+  await driver.post(`/livreur/courses/${id}/accept`);
+  // il ne peut pas récupérer une commande pas encore prête
+  await driver.post(`/livreur/courses/${id}/pickup`);
+  assert.doesNotMatch((await admin.get(`/admin/commandes/${id}`)).text, /Commande récupérée/);
+  await admin.post(`/admin/commandes/${id}/statut`, { form: { status: 'ready' } });
+  const run = (await driver.get(`/livreur/courses/${id}`)).text;
+  assert.match(run, /À encaisser/);
+  assert.match(run, /google\.com\/maps/); assert.match(run, /maps\.apple\.com/);
+  for (const a of ['pickup', 'start', 'deliver']) assert.equal((await driver.post(`/livreur/courses/${id}/${a}`)).status, 303);
+  const done = (await c.get(`/suivi/${token}`)).text;
+  assert.match(done, /Livrée/);
+  // espèces : détenues par le livreur puis remises en caisse
+  const driverId = /\/admin\/livreurs\/(\d+)\/especes/.exec((await admin.get('/admin/livreurs')).text)[1];
+  await admin.post(`/admin/livreurs/${driverId}/especes`);
+  assert.match((await admin.get(`/admin/commandes/${id}`)).text, /Espèces remises/);
+});
+
+test('paiement carte (démo) : échec, nouvel essai, succès, remboursement', async () => {
+  const c = client(); const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const r = await c.post('/api/orders', { json: checkout(await firstSlot(c), { payment_method: 'card' }) });
+  assert.match(r.data.redirect, /paiement-demo/);
+  const token = r.data.redirect.split('/').pop();
+  await c.post(`/paiement-demo/${token}`, { form: { result: 'failure' } });
+  assert.match((await c.get(`/suivi/${token}`)).text, /paiement a été refusé/);
+  const retry = await c.post(`/suivi/${token}/payer`);
+  assert.match(retry.location, /paiement-demo/);
+  await c.post(`/paiement-demo/${token}`, { form: { result: 'success' } });
+  const page = (await c.get(`/suivi/${token}`)).text;
+  assert.match(page, /Commande reçue/);
+  const id = Number(/Commande MG-(\d+)/.exec(page)[1]) - 1000;
+  await admin.post(`/admin/commandes/${id}/rembourser`, { form: { amount: '2,00' } });
+  assert.match((await admin.get(`/admin/commandes/${id}`)).text, /Partiellement remboursée/);
+  const stockBefore = await productStock(admin, 21);
+  await admin.post(`/admin/commandes/${id}/statut`, { form: { status: 'cancelled', reason: 'Test' } });
+  const detail = (await admin.get(`/admin/commandes/${id}`)).text;
+  assert.match(detail, /Remboursée/);
+  assert.equal(await productStock(admin, 21), stockBefore + 2, 'stock remis en rayon');
+});
+
+test('webhook Stripe : signature vérifiée', async () => {
+  const c = client();
+  const body = JSON.stringify({ id: 'evt_1', type: 'ping', data: { object: {} } });
+  const bad = await c.post('/api/stripe/webhook', { headers: { 'Stripe-Signature': 't=1,v1=00', 'Content-Type': 'application/json', Origin: '' }, json: undefined });
+  assert.equal(bad.status, 400);
+  const t = Math.floor(Date.now() / 1000);
+  const sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(`${t}.${body}`).digest('hex');
+  const r = await fetch(`${BASE}/api/stripe/webhook`, { method: 'POST', headers: { 'Stripe-Signature': `t=${t},v1=${sig}`, 'Content-Type': 'application/json' }, body });
+  assert.equal(r.status, 200);
+});
+
+test('sécurité : rôles, CSRF, mots de passe', async () => {
+  const anon = client(); const cust = client(); const driver = client();
+  assert.equal((await anon.get('/admin')).status, 303, 'anonyme redirigé vers la connexion');
+  await cust.login('thomas.martin@exemple.fr', 'Client-2026');
+  assert.equal((await cust.get('/admin')).status, 403);
+  assert.equal((await cust.get('/livreur')).status, 403);
+  await driver.login('lucas@maisongreen.fr', 'Livreur-2026');
+  assert.equal((await driver.get('/admin/commandes')).status, 403);
+  // requête venant d'un autre site
+  const csrf = await cust.post('/compte/profil', { form: { first_name: 'Pirate', last_name: 'X' }, headers: { Origin: 'https://evil.example' } });
+  assert.equal(csrf.status, 403);
+  const bad = await client().post('/connexion', { form: { email: 'admin@maisongreen.fr', password: 'mauvais' } });
+  assert.equal(bad.status, 401);
+});
+
+test('inscription, adresse, export RGPD, suppression', async () => {
+  const c = client();
+  const email = `new${Date.now()}@exemple.fr`;
+  const r = await c.post('/inscription', { form: { first_name: 'Nina', last_name: 'Roy', email, phone: '', password: 'motdepasse-solide', accept: 'on' } });
+  assert.equal(r.status, 303);
+  await c.post('/compte/adresses', { form: { label: 'Maison', line1: '3 rue Ganterie', postal_code: '76000', city: 'Rouen' } });
+  const exp = await c.get('/compte/donnees/export');
+  assert.equal(exp.data.profile.email, email);
+  assert.equal(exp.data.addresses.length, 1);
+  await c.post('/compte/supprimer', { form: { password: 'motdepasse-solide' } });
+  assert.equal((await client().post('/connexion', { form: { email, password: 'motdepasse-solide' } })).status, 401);
+});
+
+test('admin : produit, catégorie, zone, créneau, pause des commandes', async () => {
+  const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const p = await admin.post('/admin/produits/nouveau', { form: { name: 'Coca-Cola Zéro', price: '2,50', unit: '1,5 L', stock: '17', max_per_order: '10', category_id: '5', description: 'Test', is_active: 'on' } });
+  assert.equal(p.status, 303);
+  assert.match((await client().get('/boutique?q=coca zero')).text, /Coca-Cola Zéro/);
+  await admin.post('/admin/categories', { form: { name: 'Surgelés', tone: 'sky' } });
+  assert.match((await admin.get('/admin/categories')).text, /Surgelés/);
+  const z = await admin.post('/admin/zones', { form: { name: 'Zone test', postal_codes: '76000', fee: '1', min_order: '1', eta_minutes: '30' } });
+  assert.equal(z.status, 422, 'code postal déjà utilisé refusé');
+  await admin.post('/admin/zones', { form: { name: 'Elbeuf', postal_codes: '76500', fee: '6,99', min_order: '40', eta_minutes: '60' } });
+  assert.equal((await client().get('/api/zone?cp=76500')).data.fee, 699);
+  await admin.post('/admin/horaires/reglages', { form: { orders_paused: 'on', pause_message: 'Inventaire en cours', lead_time_minutes: '45' } });
+  const c = client();
+  assert.match((await c.get('/')).text, /Inventaire en cours/);
+  const blocked = await c.post('/api/orders', { json: checkout('2099-01-01|10:00') });
+  assert.equal(blocked.status, 422);
+  await admin.post('/admin/horaires/reglages', { form: { pause_message: 'x', lead_time_minutes: '45' } });
+});
+
+test('admin : import et export du catalogue en CSV', async () => {
+  const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  assert.equal((await client().get('/admin/produits/import')).status, 303, 'page protégée');
+  assert.equal((await admin.get('/admin/produits/import')).status, 200);
+  const exp = await admin.get('/admin/produits/export.csv');
+  assert.match(exp.text, /^\uFEFF?nom;rayon;prix/);
+  assert.match(exp.text, /Pommes Belchard;Fruits & légumes;3,40;1 kg/);
+
+  const upload = (csv, mode = 'maj', filename = 'catalogue.csv') => {
+    const fd = new FormData();
+    fd.append('mode', mode);
+    fd.append('fichier', new Blob([csv], { type: 'text/csv' }), filename);
+    return admin.post('/admin/produits/import', { multipart: fd });
+  };
+  // erreurs : rien n'est importé, lignes signalées
+  const bad = await upload('Nom;Catégorie;Prix\nPain;Boulangerie;abc\n;Boulangerie;2\n');
+  assert.equal(bad.status, 422);
+  assert.match(bad.text, /Ligne 2 \(Pain\)/);
+  assert.match(bad.text, /Ligne 3/);
+  assert.match((await upload('a;b\n1;2', 'maj', 'x.xlsx')).text, /classeur/);
+
+  // remplacement complet (Windows-1252, séparateur « ; », guillemets)
+  const csv = 'nom;rayon;prix;format;stock;origine;description;vedette\r\n'
+    + 'Baguette tradition;Boulangerie;1,30;pièce;50;Rouen;"Farine Label Rouge; cuite sur place";oui\r\n'
+    + 'Pommes Belchard;Fruits & légumes;3,60 €;1 kg;;Normandie;;\r\n';
+  const prev = await upload(Buffer.from(csv.replace('€', '\x80'), 'latin1'), 'remplacer');
+  assert.equal(prev.status, 200);
+  assert.match(prev.text, /2 produits/);
+  assert.match(prev.text, /stock non renseigné/);
+  const token = /name="token" value="([a-f0-9]+)"/.exec(prev.text)[1];
+  const done = await admin.post('/admin/produits/import', { form: { token } });
+  assert.equal(done.status, 303);
+  assert.equal((await admin.post('/admin/produits/import', { form: { token } })).status, 303, 'jeton à usage unique');
+  const after = (await admin.get('/admin/produits/export.csv')).text.trim().split('\r\n');
+  assert.equal(after.length, 3, after.join('\n'));
+  assert.match(after.join('\n'), /Baguette tradition;Boulangerie;1,30;pièce;50;Rouen;"Farine Label Rouge; cuite sur place";oui;oui;20/);
+  assert.match(after.join('\n'), /Pommes Belchard;Fruits & légumes;3,60;1 kg;0/);
+  const shop = (await client().get('/boutique')).text;
+  assert.match(shop, /Baguette tradition/);
+  assert.doesNotMatch(shop, /Camembert/);
+});
+
+test('admin : coordonnées de la boutique affichées sur le site et les pages légales', async () => {
+  const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const home = (await client().get('/')).text;
+  assert.match(home, /42 rue de la République/);
+  assert.doesNotMatch(home, /Gros-Horloge|02 35 00 00 00/);
+  assert.equal((await admin.post('/admin/boutique', { form: { address: '42 rue de la République', postal: '76000', city: 'Rouen', phone: '0235123456', email: 'contact@maisongreen.fr' } })).status, 303);
+  assert.equal((await admin.post('/admin/boutique', { form: { address: '', postal: '7600', city: 'Rouen', phone: '', email: 'x' } })).status, 422);
+  const legal = (await client().get('/mentions-legales')).text;
+  assert.match(legal, /42 rue de la République, 76000 Rouen/);
+  assert.match(legal, /contact@maisongreen\.fr · 02 35 12 34 56/);
+  assert.match((await client().get('/')).text, /href="tel:0235123456"/);
+  assert.equal((await client().post('/admin/boutique', { form: { address: 'x' } })).status, 303, 'réservé à l’admin');
+});
+
+test('rayons de l’épicerie et chiffre d’affaires annuel', async () => {
+  const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const cats = (await admin.get('/admin/categories')).text;
+  for (const name of ['Boulangerie &amp; viennoiseries', 'Crèmerie &amp; fromages', 'Boucherie &amp; charcuterie', 'Surgelés', 'Hygiène &amp; beauté', 'Entretien &amp; maison']) assert.match(cats, new RegExp(name));
+  assert.doesNotMatch(cats, /value="Produits frais"/);
+  // un rayon vide n'apparaît pas dans la boutique
+  assert.doesNotMatch((await client().get('/boutique')).text, /Surgelés/);
+
+  assert.equal((await client().get('/admin/chiffre-affaires')).status, 303, 'réservé à l’admin');
+  const year = new Date().getFullYear();
+  const page = await admin.get('/admin/chiffre-affaires');
+  assert.equal(page.status, 200);
+  assert.match(page.text, new RegExp(`Chiffre d'affaires ${year}`));
+  assert.match(page.text, /Décembre/);
+  const csv = await admin.get(`/admin/chiffre-affaires/export.csv?annee=${year}`);
+  assert.equal(csv.status, 200);
+  const lines = csv.text.trim().split('\r\n');
+  assert.match(lines[0], /^\uFEFF?Numéro;Date;Heure;Client/);
+  assert.ok(lines.length > 5, 'les commandes de démonstration sont exportées');
+  assert.match(lines[1], /^MG-\d+;\d{2}\/\d{2}\/\d{4};\d{2}:\d{2};/);
+});
+
+test('alertes push livreur (VAPID signé) et sauvegarde de la base', async () => {
+  const http = await import('node:http');
+  const hits = [];
+  const fake = http.createServer((req, res) => { hits.push({ url: req.url, headers: req.headers }); res.writeHead(201); res.end(); });
+  await new Promise((r) => fake.listen(0, r));
+  const pushUrl = `http://localhost:${fake.address().port}`;
+  const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  try {
+    const driver = client();
+    await driver.login('lucas@maisongreen.fr', 'Livreur-2026');
+    assert.equal((await client().get('/api/push/key')).status === 200, false, 'clé réservée à l’équipe');
+    const { data } = await driver.get('/api/push/key');
+    assert.equal(Buffer.from(data.key, 'base64url').length, 65);
+    assert.equal((await driver.post('/api/push/subscribe', { json: { endpoint: 'ftp://pirate' } })).status, 422);
+    assert.equal((await driver.post('/api/push/subscribe', { json: { endpoint: `${pushUrl}/push/lucas`, keys: { p256dh: 'x', auth: 'y' } } })).status, 200);
+
+    // nouvelle commande, confirmée par la boutique → les livreurs sont alertés
+    const id = Number(/href="\/admin\/produits\/(\d+)"[^>]*>Baguette tradition/.exec((await admin.get('/admin/produits')).text)[1]);
+    const c = client();
+    const r = await c.post('/api/orders', { json: checkout(await firstSlot(c), { items: [{ id, qty: 15 }] }) });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    const orderId = Number((await c.get(r.data.redirect)).text.match(/MG-(\d+)/)[1]) - 1000;
+    await admin.post(`/admin/commandes/${orderId}/statut`, { form: { status: 'confirmed' } });
+    for (let i = 0; i < 40 && !hits.length; i++) await new Promise((w) => setTimeout(w, 50));
+    assert.equal(hits.length, 1, 'une alerte push envoyée au livreur');
+    assert.equal(hits[0].url, '/push/lucas');
+    const m = /^vapid t=([^,]+), k=(.+)$/.exec(hits[0].headers.authorization);
+    const [h, claims, sig] = m[1].split('.');
+    const pub = Buffer.from(m[2], 'base64url');
+    const key = crypto.createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: pub.subarray(1, 33).toString('base64url'), y: pub.subarray(33).toString('base64url') }, format: 'jwk' });
+    assert.ok(crypto.verify('sha256', Buffer.from(`${h}.${claims}`), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig, 'base64url')), 'signature VAPID valide');
+    assert.equal(JSON.parse(Buffer.from(claims, 'base64url')).aud, pushUrl);
+    const notes = (await driver.get('/api/notifications')).data;
+    assert.match(notes[0].title, /Nouvelle course MG-/);
+  } finally { fake.close(); }
+
+  // sauvegarde téléchargeable par l'admin uniquement
+  assert.equal((await client().get('/admin/sauvegarde')).status, 303);
+  const backup = await admin.get('/admin/sauvegarde');
+  assert.equal(backup.status, 200);
+  assert.ok(backup.text.startsWith('SQLite format 3'), 'fichier SQLite complet');
+  assert.match((await admin.get('/admin/horaires')).text, /Dernière :/);
+});
+
+test('admin : nouveau mot de passe pour un livreur', async () => {
+  const admin = client(); const driver = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  await driver.login('ines@maisongreen.fr', 'Livreur-2026');
+  const id = Number(/ines@maisongreen\.fr[\s\S]*?\/admin\/livreurs\/(\d+)\/mot-de-passe/.exec((await admin.get('/admin/livreurs')).text)[1]);
+  const r = await admin.post(`/admin/livreurs/${id}/mot-de-passe`);
+  assert.equal(r.status, 303, 'redirection : rafraîchir la page ne recrée pas de mot de passe');
+  const shown = (await admin.get(r.location)).text;
+  const pwd = /ines@maisongreen\.fr<\/strong> \/ <strong>([a-f0-9-]+)<\/strong>/.exec(shown)[1];
+  assert.doesNotMatch((await admin.get(r.location)).text, new RegExp(pwd), 'affiché une seule fois');
+  assert.equal((await driver.get('/livreur')).status, 303, 'ancienne session déconnectée');
+  assert.equal((await client().post('/connexion', { form: { email: 'ines@maisongreen.fr', password: 'Livreur-2026' } })).status, 401, 'ancien mot de passe refusé');
+  await client().login('ines@maisongreen.fr', `${pwd} `); // espace en trop toléré
+  assert.equal((await client().post(`/admin/livreurs/${id}/mot-de-passe`)).status, 303, 'réservé à l’admin');
+});
+
+test('remise à zéro avant l’ouverture (dernier test : efface les commandes)', async () => {
+  const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  assert.match((await admin.get('/admin/horaires')).text, /Remise à zéro avant l'ouverture/);
+  assert.equal((await client().post('/admin/remise-a-zero', { form: { confirm: 'EFFACER' } })).status, 303, 'réservé à l’admin');
+  const before = (await admin.get('/admin/chiffre-affaires/export.csv')).text.trim().split('\r\n').length;
+  assert.ok(before > 2);
+  await admin.post('/admin/remise-a-zero', { form: { confirm: 'oui' } });
+  assert.equal((await admin.get('/admin/chiffre-affaires/export.csv')).text.trim().split('\r\n').length, before, 'sans confirmation, rien n’est effacé');
+  assert.equal((await admin.post('/admin/remise-a-zero', { form: { confirm: 'effacer', customers: '1' } })).status, 303);
+  assert.equal((await admin.get('/admin/chiffre-affaires/export.csv')).text.trim().split('\r\n').length, 1, 'plus aucune commande');
+  assert.match((await client().get('/boutique')).text, /Pommes Belchard|Baguette/, 'le catalogue est conservé');
+  // la numérotation repart à MG-1001
+  const id = Number(/href="\/admin\/produits\/(\d+)"[^>]*>Baguette tradition/.exec((await admin.get('/admin/produits')).text)[1]);
+  const c = client();
+  const r = await c.post('/api/orders', { json: checkout(await firstSlot(c), { items: [{ id, qty: 15 }] }) });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  assert.match((await c.get(r.data.redirect)).text, /MG-1001/);
+});

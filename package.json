@@ -1,0 +1,17 @@
+{
+  "name": "maison-green",
+  "version": "1.0.0",
+  "description": "Maison Green — commande et livraison de l'épicerie, Rouen",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "seed": "node --disable-warning=ExperimentalWarning src/seed.js",
+    "reset": "node --disable-warning=ExperimentalWarning src/seed.js --reset",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}

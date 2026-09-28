@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin
+Disallow: /livreur
+Disallow: /compte
+Disallow: /suivi
+Disallow: /api
