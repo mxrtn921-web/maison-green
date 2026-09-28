@@ -355,35 +355,35 @@
     };
     document.addEventListener('click', () => { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); }, { once: true });
     // ——— Alertes push (téléphone verrouillé) ———————————————————————
-    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === ‘MacIntel’ && navigator.maxTouchPoints > 1);
-    const standalone = matchMedia(‘(display-mode: standalone)’).matches || navigator.standalone === true;
-    const pushSupported = ‘serviceWorker’ in navigator && ‘PushManager’ in window && ‘Notification’ in window && (!isIos || standalone);
-    const b64ToBytes = (s) => { const p = ‘=’.repeat((4 - (s.length % 4)) % 4); const raw = atob((s + p).replace(/-/g, ‘+’).replace(/_/g, ‘/’)); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
-    let pushState = ‘unknown’;
-    const swReady = pushSupported ? navigator.serviceWorker.register(‘/sw.js’).then(() => navigator.serviceWorker.ready).catch(() => null) : Promise.resolve(null);
+    const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    const b64ToBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4); const raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
+    let pushState = 'unknown';
+    const swReady = pushSupported ? navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).catch(() => null) : Promise.resolve(null);
     async function pushUi() {
-      const banner = $(‘[data-push-banner]’); if (!banner) return;
-      const text = $(‘[data-push-text]’, banner); const btn = $(‘[data-push-enable]’, banner);
+      const banner = $('[data-push-banner]'); if (!banner) return;
+      const text = $('[data-push-text]', banner); const btn = $('[data-push-enable]', banner);
       const show = (msg, withBtn = true) => { banner.hidden = false; text.textContent = msg; btn.hidden = !withBtn; };
       if (!pushSupported) {
-        if (isIos) return show(‘Sur iPhone : assurez-vous d’être dans l’app (via l’écran d’accueil). Les notifications push font l’objet d’une limitation connue sur Safari iOS.’, false);
+        if (isIos && !standalone) return show('Sur iPhone : touchez Partager puis « Sur l’écran d’accueil », ouvrez l’app depuis l’icône et activez les alertes.', false);
         banner.hidden = true; return;
       }
-      if (Notification.permission === ‘denied’) return show(‘Les notifications sont bloquées pour ce site : autorisez-les dans les réglages du navigateur.’, false);
+      if (Notification.permission === 'denied') return show('Les notifications sont bloquées pour ce site : autorisez-les dans les réglages du navigateur.', false);
       const reg = await swReady; const sub = reg && await reg.pushManager.getSubscription();
-      if (sub && Notification.permission === ‘granted’) { pushState = ‘on’; banner.hidden = true; api(‘/api/push/subscribe’, sub.toJSON()); return; }
-      show(‘Activez les alertes sur ce téléphone pour être prévenu même écran verrouillé.’);
+      if (sub && Notification.permission === 'granted') { pushState = 'on'; banner.hidden = true; api('/api/push/subscribe', sub.toJSON()); return; }
+      show('Activez les alertes sur ce téléphone pour être prévenu même écran verrouillé.');
     }
-    document.addEventListener(‘click’, async (e) => {
-      if (!e.target.closest(‘[data-push-enable]’)) return;
-      const btn = e.target.closest(‘[data-push-enable]’); btn.disabled = true;
+    document.addEventListener('click', async (e) => {
+      if (!e.target.closest('[data-push-enable]')) return;
+      const btn = e.target.closest('[data-push-enable]'); btn.disabled = true;
       try {
-        if (await Notification.requestPermission() !== ‘granted’) { pushUi(); return; }
-        const reg = await swReady; const { data } = await api(‘/api/push/key’);
+        if (await Notification.requestPermission() !== 'granted') { pushUi(); return; }
+        const reg = await swReady; const { data } = await api('/api/push/key');
         const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(data.key) });
-        const r = await api(‘/api/push/subscribe’, sub.toJSON());
-        if (r.ok) { toast({ title: ‘Alertes activées’, body: ‘Vous serez prévenu même téléphone verrouillé.’ }); api(‘/api/push/test’, {}); }
-      } catch (err) { toast({ title: ‘Activation impossible’, body: String(err.message || err) }); }
+        const r = await api('/api/push/subscribe', sub.toJSON());
+        if (r.ok) { toast({ title: 'Alertes activées', body: 'Vous serez prévenu même téléphone verrouillé.' }); api('/api/push/test', {}); }
+      } catch (err) { toast({ title: 'Activation impossible', body: String(err.message || err) }); }
       btn.disabled = false; pushUi();
     });
     pushUi();
