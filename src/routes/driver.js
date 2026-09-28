@@ -30,7 +30,16 @@ get('/livreur/courses/:id', (ctx) => {
   const driver = driverOf(ctx);
   const o = getOrder(Number(ctx.params.id));
   // Un livreur ne voit que ses courses, ou celles qui attendent un livreur.
-  if (!o || (o.driver_id && o.driver_id !== ctx.user.id) || (!o.driver_id && !['confirmed', 'preparing', 'ready'].includes(o.status))) throw new HttpError(404, 'Course introuvable');
+  // Plus de page d'erreur : si la course n'est plus accessible, retour à la liste avec une explication.
+  const mine = o && Number(o.driver_id) === Number(ctx.user.id);
+  if (!o || (o.driver_id && !mine) || (!o.driver_id && !['confirmed', 'preparing', 'ready'].includes(o.status))) {
+    const why = !o ? 'Cette course n’existe plus.'
+      : o.status === 'cancelled' ? `La commande ${o.number} a été annulée.`
+      : o.driver_id ? `La course ${o.number} a déjà été acceptée par un autre livreur.`
+      : `La course ${o.number} n’est plus disponible.`;
+    setFlash(ctx.res, 'error', why);
+    return redirect(ctx.res, '/livreur');
+  }
   sendHtml(ctx.res, driverRunPage(ctx, { driver, order: o, items: orderItems(o.id) }));
 });
 
@@ -64,6 +73,8 @@ post('/api/livreur/courses/:id/:action', async (ctx) => {
     sendJson(ctx.res, { ok: false, message: e.message }, 409);
   }
 });
+
+get('/livreur/courses/:id/:action', (ctx) => { driverOf(ctx); redirect(ctx.res, `/livreur/courses/${Number(ctx.params.id) || ''}`); });
 
 post('/livreur/disponibilite', (ctx) => {
   driverOf(ctx);

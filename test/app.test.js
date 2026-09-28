@@ -104,6 +104,18 @@ test('parcours complet espèces : client → admin → livreur → livrée', asy
   assert.equal(acc.status, 200, JSON.stringify(acc.data));
   assert.equal(acc.data.ok, true);
   assert.doesNotMatch((await driver.get('/livreur?onglet=disponibles')).text, new RegExp(number));
+  // plus jamais de page 404 : la course acceptée s'ouvre, une URL d'action ouverte en GET renvoie vers la course
+  assert.equal((await driver.get(`/livreur/courses/${id}`)).status, 200);
+  assert.equal((await driver.get(`/livreur/courses/${id}/accept`)).location, `/livreur/courses/${id}`);
+  // formulaire « Accepter » de la page : retour sur la course (200), pas d'erreur
+  const other = await c.post('/api/orders', { json: checkout(await firstSlot(c)) });
+  const otherId = Number((await c.get(other.data.redirect)).text.match(/MG-(\d+)/)[1]) - 1000;
+  const acc2 = await driver.post(`/livreur/courses/${otherId}/accept`, { form: {} });
+  assert.equal(acc2.location, `/livreur/courses/${otherId}`);
+  assert.equal((await driver.get(acc2.location)).status, 200);
+  // une course introuvable ou annulée renvoie vers la liste avec un message
+  assert.equal((await driver.get('/livreur/courses/999999')).location, '/livreur');
+  await admin.post(`/admin/commandes/${otherId}/statut`, { form: { status: 'cancelled', reason: 'Test' } });
   const run = (await driver.get(`/livreur/courses/${id}`)).text;
   assert.match(run, /À encaisser/);
   assert.match(run, /google\.com\/maps/); assert.match(run, /maps\.apple\.com/);

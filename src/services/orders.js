@@ -357,7 +357,7 @@ export async function driverAction(orderId, driver, action) {
       body: u.payment_method === 'card' ? 'Commande annulée, client remboursé.' : 'Commande annulée (espèces : rien à rembourser).', orderId, link: `/admin/commandes/${orderId}` });
     return u;
   }
-  if (o.driver_id !== driver.id) throw new HttpError(403, 'Cette course ne vous est pas attribuée.');
+  if (Number(o.driver_id) !== Number(driver.id)) throw new HttpError(403, 'Cette course ne vous est pas attribuée.');
   if (action === 'pickup') {
     if (!['confirmed', 'preparing', 'ready', 'assigned'].includes(o.status)) throw new HttpError(409, 'Cette commande ne peut pas être récupérée.');
     tx(() => {

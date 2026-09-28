@@ -390,7 +390,10 @@
 
     const swapMain = debounce(async () => {
       if (document.activeElement && document.activeElement.matches('input, textarea, select')) return;
-      const html = await fetch(location.href, { credentials: 'same-origin' }).then((r) => r.text());
+      const resp = await fetch(location.href, { credentials: 'same-origin' });
+      // Page devenue inaccessible (course prise, annulée…) ou redirection : on recharge vraiment.
+      if (!resp.ok || resp.redirected) { location.reload(); return; }
+      const html = await resp.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const next = $('main', doc); const cur = $('main');
       if (next && cur) { const y = scrollY; cur.innerHTML = next.innerHTML; scrollTo(0, y); pushUi(); }
