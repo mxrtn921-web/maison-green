@@ -1,6 +1,6 @@
 // Application livreur : uniquement les informations nécessaires à la livraison.
 import { get, post } from '../router.js';
-import { sendHtml, redirect, setFlash, HttpError } from '../lib/http.js';
+import { sendHtml, sendJson, redirect, setFlash, HttpError } from '../lib/http.js';
 import { subscribe } from '../lib/events.js';
 import { one, all, run } from '../db.js';
 import { requireRole } from '../auth.js';
@@ -34,7 +34,7 @@ get('/livreur/courses/:id', (ctx) => {
   sendHtml(ctx.res, driverRunPage(ctx, { driver, order: o, items: orderItems(o.id) }));
 });
 
-const MESSAGES = { accept: 'Course acceptée. Elle est dans « Mes courses ».', pickup: 'Commande récupérée. Bonne route !', start: 'Livraison démarrée : le client est prévenu.', deliver: 'Livraison terminée. Merci !' };
+const MESSAGES = { accept: 'Course acceptée : allez la récupérer puis livrez-la.', refuse: 'Course refusée : la commande est annulée et le client remboursé.', pickup: 'Commande récupérée. Bonne route !', start: 'Livraison démarrée : le client est prévenu.', deliver: 'Livraison terminée. Merci !' };
 post('/livreur/courses/:id/:action', async (ctx) => {
   const driver = driverOf(ctx);
   const { id, action } = ctx.params;
@@ -47,7 +47,22 @@ post('/livreur/courses/:id/:action', async (ctx) => {
     if (!(e instanceof HttpError)) throw e;
     setFlash(ctx.res, 'error', e.message);
   }
-  redirect(ctx.res, action === 'deliver' ? '/livreur?onglet=terminees' : `/livreur/courses/${id}`);
+  redirect(ctx.res, action === 'deliver' ? '/livreur?onglet=terminees' : action === 'refuse' ? '/livreur?onglet=disponibles' : `/livreur/courses/${id}`);
+});
+
+// Boutons « Accepter / Refuser » directement dans la notification (service worker).
+post('/api/livreur/courses/:id/:action', async (ctx) => {
+  const driver = driverOf(ctx);
+  const { id, action } = ctx.params;
+  if (!['accept', 'refuse'].includes(action)) throw new HttpError(404);
+  if (action === 'accept' && !driver.is_available) return sendJson(ctx.res, { ok: false, message: 'Passez-vous « Disponible » pour accepter une course.' }, 409);
+  try {
+    const o = await driverAction(Number(id), ctx.user, action);
+    sendJson(ctx.res, { ok: true, number: o.number, message: MESSAGES[action] });
+  } catch (e) {
+    if (!(e instanceof HttpError)) throw e;
+    sendJson(ctx.res, { ok: false, message: e.message }, 409);
+  }
 });
 
 post('/livreur/disponibilite', (ctx) => {

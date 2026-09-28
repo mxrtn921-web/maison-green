@@ -146,15 +146,26 @@ export function createOrder(input, user) {
   return { order, items: orderItems(order.id) };
 }
 
-/** Commande validée (espèces, ou carte payée) : on prévient la boutique et le client. */
+/** Commande validée (espèces, ou carte payée) : confirmée automatiquement, les livreurs sont alertés
+ *  tout de suite (ils acceptent ou refusent), et on prévient la boutique et le client. */
 function onOrderPlaced(order) {
   const items = orderItems(order.id);
-  notify({ audience: 'admin', kind: 'order_new', title: `Nouvelle commande ${order.number}`,
-    body: `${order.first_name} ${order.last_name} · ${money(order.total_cents)} · ${order.payment_method === 'cash' ? 'Espèces' : 'Carte'} · ${slotLabel(order)}`,
-    orderId: order.id, link: `/admin/commandes/${order.id}` });
-  broadcast(order, { isNew: true });
-  const o = { ...order, slot_label: slotLabel(order) };
-  sendEmail(order.email, orderEmail(o, items, 'confirmation'));
+  const confirmed = tx(() => {
+    const r = run("UPDATE orders SET status = 'confirmed', updated_at = ? WHERE id = ? AND status = 'received'", nowIso(), order.id);
+    if (r.changes === 1) addEvent(order.id, 'confirmed', 'Commande confirmée automatiquement — en attente d’un livreur');
+    return getOrder(order.id);
+  }) || order;
+  notify({ audience: 'admin', kind: 'order_new', title: `Nouvelle commande ${confirmed.number}`,
+    body: `${confirmed.first_name} ${confirmed.last_name} · ${money(confirmed.total_cents)} · ${confirmed.payment_method === 'cash' ? 'Espèces' : 'Carte'} · ${slotLabel(confirmed)} · envoyée aux livreurs`,
+    orderId: confirmed.id, link: `/admin/commandes/${confirmed.id}` });
+  if (confirmed.status === 'confirmed' && !confirmed.driver_id) {
+    notify({ audience: 'driver', kind: 'delivery_available', title: `Nouvelle course ${confirmed.number}`,
+      body: `${slotLabel(confirmed)} · ${confirmed.postal_code} ${confirmed.city}${confirmed.payment_method === 'cash' ? ` · ${money(confirmed.total_cents)} à encaisser` : ''} — Accepter ou refuser ?`,
+      orderId: confirmed.id, link: `/livreur/courses/${confirmed.id}` });
+  }
+  broadcast(confirmed, { isNew: true });
+  const o = { ...confirmed, slot_label: slotLabel(confirmed) };
+  sendEmail(confirmed.email, orderEmail(o, items, 'confirmation'));
   const shopEmail = one("SELECT value FROM settings WHERE key = 'shop_email'");
   if (shopEmail) sendEmail(JSON.parse(shopEmail.value), orderEmail(o, items, 'admin_new'));
 }
@@ -330,16 +341,25 @@ export async function driverAction(orderId, driver, action) {
   if (!o) throw new HttpError(404, 'Course introuvable');
   if (action === 'accept') {
     if (!['confirmed', 'preparing', 'ready'].includes(o.status)) throw new HttpError(409, 'Cette course n’est pas disponible.');
-    const r = run("UPDATE orders SET driver_id = ?, status = CASE WHEN status = 'ready' THEN 'assigned' ELSE status END, updated_at = ? WHERE id = ? AND driver_id IS NULL", driver.id, nowIso(), orderId);
+    // Le livreur accepte : la course est à lui, il peut aller la récupérer et la livrer.
+    const r = run("UPDATE orders SET driver_id = ?, status = 'assigned', updated_at = ? WHERE id = ? AND driver_id IS NULL AND status IN ('confirmed','preparing','ready')", driver.id, nowIso(), orderId);
     if (r.changes !== 1) throw new HttpError(409, 'Un autre livreur a déjà accepté cette course.');
     addEvent(orderId, 'assigned', `Course acceptée par ${driver.first_name}`, driver.id);
     const u = getOrder(orderId);
     notify({ audience: 'admin', kind: 'driver_accepted', title: `${driver.first_name} a accepté ${u.number}`, orderId, link: `/admin/commandes/${orderId}` });
     broadcast(u); return u;
   }
+  if (action === 'refuse') {
+    // Le livreur refuse : la commande est annulée, le stock remis et le client remboursé (carte).
+    if (o.driver_id || !['confirmed', 'preparing', 'ready'].includes(o.status)) throw new HttpError(409, 'Cette course n’est plus disponible.');
+    const u = await cancelOrder(orderId, driver, `Refusée par le livreur (${driver.first_name})`);
+    notify({ audience: 'admin', kind: 'driver_refused', title: `${driver.first_name} a refusé ${u.number}`,
+      body: u.payment_method === 'card' ? 'Commande annulée, client remboursé.' : 'Commande annulée (espèces : rien à rembourser).', orderId, link: `/admin/commandes/${orderId}` });
+    return u;
+  }
   if (o.driver_id !== driver.id) throw new HttpError(403, 'Cette course ne vous est pas attribuée.');
   if (action === 'pickup') {
-    if (!['ready', 'assigned'].includes(o.status)) throw new HttpError(409, 'La commande n’est pas encore prête. Attendez le feu vert de la boutique.');
+    if (!['confirmed', 'preparing', 'ready', 'assigned'].includes(o.status)) throw new HttpError(409, 'Cette commande ne peut pas être récupérée.');
     tx(() => {
       run("UPDATE orders SET picked_up_at = ?, status = 'assigned', updated_at = ? WHERE id = ?", nowIso(), nowIso(), orderId);
       addEvent(orderId, 'assigned', 'Commande récupérée en boutique', driver.id);

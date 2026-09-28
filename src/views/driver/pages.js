@@ -50,7 +50,7 @@ export function driverHomePage(ctx, { driver, tab, available, mine, done, counts
         <p class="run-meta">${o.postal_code} ${o.city} · ${tab === 'terminees' ? `livrée à ${fmtTime(o.delivered_at)}` : `${dayLabel(o.slot_date)}, ${hLabel(o.slot_start)}–${hLabel(o.slot_end)}`}</p>
       </a>
       <div class="run-foot">${payLine(o)}
-        ${tab === 'disponibles' ? html`<form method="post" action="/livreur/courses/${o.id}/accept"><button class="btn btn-primary btn-sm" ${raw(driver.is_available ? '' : 'disabled')}>Accepter</button></form>`
+        ${tab === 'disponibles' ? html`<div class="row" style="gap:8px"><form method="post" action="/livreur/courses/${o.id}/refuse" data-confirm="Refuser ${o.number} ? La commande sera annulée et le client remboursé."><button class="btn btn-ghost btn-sm">Refuser</button></form><form method="post" action="/livreur/courses/${o.id}/accept"><button class="btn btn-primary btn-sm" ${raw(driver.is_available ? '' : 'disabled')}>Accepter</button></form></div>`
           : tab === 'mes-courses' ? html`<a class="btn btn-dark btn-sm" href="/livreur/courses/${o.id}">Ouvrir ${icon('chevron')}</a>` : html`<span class="small muted">${money(o.total_cents)}</span>`}
       </div>
     </article>`) : html`<div class="empty"><h2 class="h2">${empty[0]}</h2><p>${empty[1]}</p></div>`}
@@ -62,9 +62,8 @@ export function driverRunPage(ctx, { driver, order: o, items }) {
   const mine = o.driver_id === ctx.user.id;
   const cash = o.payment_method === 'cash' && o.payment_status === 'due_on_delivery';
   let cta = '';
-  if (!mine && !o.driver_id) cta = html`<form method="post" action="/livreur/courses/${o.id}/accept"><button class="btn btn-primary btn-block">Accepter la course</button></form>`;
-  else if (mine && ['confirmed', 'preparing'].includes(o.status)) cta = html`<button class="btn btn-ghost btn-block" disabled>${icon('clock')} En préparation en boutique…</button>`;
-  else if (mine && ['ready', 'assigned'].includes(o.status) && !o.picked_up_at) cta = html`<form method="post" action="/livreur/courses/${o.id}/pickup"><button class="btn btn-dark btn-block">${icon('bag')} Récupérer la commande</button></form>`;
+  if (!mine && !o.driver_id) cta = html`<div class="stack" style="--s:10px"><form method="post" action="/livreur/courses/${o.id}/accept"><button class="btn btn-primary btn-block">${icon('check')} Accepter la course</button></form><form method="post" action="/livreur/courses/${o.id}/refuse" data-confirm="Refuser cette course ? La commande sera annulée et le client remboursé."><button class="btn btn-ghost btn-block">Refuser</button></form></div>`;
+  else if (mine && ['confirmed', 'preparing', 'ready', 'assigned'].includes(o.status) && !o.picked_up_at) cta = html`<form method="post" action="/livreur/courses/${o.id}/pickup"><button class="btn btn-dark btn-block">${icon('bag')} Récupérer la commande</button></form>`;
   else if (mine && o.status === 'assigned' && o.picked_up_at) cta = html`<form method="post" action="/livreur/courses/${o.id}/start"><button class="btn btn-primary btn-block">${icon('bike')} Commencer la livraison</button></form>`;
   else if (mine && o.status === 'out_for_delivery') cta = html`<form method="post" action="/livreur/courses/${o.id}/deliver" data-confirm="${cash ? `Avez-vous bien encaissé ${money(o.cash_to_collect_cents)} ?` : 'Confirmer la livraison ?'}"><button class="btn btn-primary btn-block">${icon('check')} ${cash ? `Livrée · ${money(o.cash_to_collect_cents)} encaissés` : 'Commande livrée'}</button></form>`;
 

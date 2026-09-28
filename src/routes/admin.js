@@ -158,7 +158,7 @@ post('/admin/commandes/:id/note', (ctx) => {
 get('/api/admin/events', (ctx) => { admin(ctx); subscribe(ctx.req, ctx.res, ['admin', `user:${ctx.user.id}`]); });
 get('/api/notifications', (ctx) => {
   requireRole(ctx, 'admin', 'driver');
-  sendJson(ctx.res, notificationsFor(ctx.user).map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, unread: !n.read_at, created_at: n.created_at })));
+  sendJson(ctx.res, notificationsFor(ctx.user).map((n) => ({ id: n.id, kind: n.kind, order_id: n.order_id, title: n.title, body: n.body, link: n.link, unread: !n.read_at, created_at: n.created_at })));
 });
 // Alertes push : abonnement de l'appareil (boutique et livreurs).
 get('/api/push/key', (ctx) => { requireRole(ctx, 'admin', 'driver'); sendJson(ctx.res, { key: Push.publicKey() }); });
