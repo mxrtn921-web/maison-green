@@ -149,12 +149,32 @@ export function createOrder(input, user) {
 /** Commande validée (espèces, ou carte payée) : on prévient la boutique et le client. */
 function onOrderPlaced(order) {
   const items = orderItems(order.id);
-  notify({ audience: 'admin', kind: 'order_new', title: `Nouvelle commande ${order.number}`,
-    body: `${order.first_name} ${order.last_name} · ${money(order.total_cents)} · ${order.payment_method === 'cash' ? 'Espèces' : 'Carte'} · ${slotLabel(order)}`,
-    orderId: order.id, link: `/admin/commandes/${order.id}` });
-  broadcast(order, { isNew: true });
-  const o = { ...order, slot_label: slotLabel(order) };
-  sendEmail(order.email, orderEmail(o, items, 'confirmation'));
+  
+  // Confirmer automatiquement la commande et notifier le livreur
+  const confirmed = tx(() => {
+    run('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', 'confirmed', nowIso(), order.id);
+    addEvent(order.id, 'confirmed', 'Commande confirmée automatiquement');
+    return getOrder(order.id);
+  });
+  
+  // Notifier l'admin
+  notify({ audience: 'admin', kind: 'order_new', title: `Nouvelle commande ${confirmed.number}`,
+    body: `${confirmed.first_name} ${confirmed.last_name} · ${money(confirmed.total_cents)} · ${confirmed.payment_method === 'cash' ? 'Espèces' : 'Carte'} · ${slotLabel(confirmed)}`,
+    orderId: confirmed.id, link: `/admin/commandes/${confirmed.id}` });
+  
+  // Notifier les livreurs avec boutons accept/refuse
+  notify({ audience: 'driver', kind: 'delivery_available', title: `Nouvelle course ${confirmed.number}`,
+    body: `${slotLabel(confirmed)} · ${confirmed.postal_code} ${confirmed.city}${confirmed.payment_method === 'cash' ? ` · ${money(confirmed.total_cents)} à encaisser` : ''}`,
+    orderId: confirmed.id, link: '/livreur?onglet=disponibles',
+    actions: [
+      { action: 'accept', title: 'Accepter' },
+      { action: 'refuse', title: 'Refuser' }
+    ]
+  });
+  
+  broadcast(confirmed, { isNew: true });
+  const o = { ...confirmed, slot_label: slotLabel(confirmed) };
+  sendEmail(confirmed.email, orderEmail(o, items, 'confirmation'));
   const shopEmail = one("SELECT value FROM settings WHERE key = 'shop_email'");
   if (shopEmail) sendEmail(JSON.parse(shopEmail.value), orderEmail(o, items, 'admin_new'));
 }
