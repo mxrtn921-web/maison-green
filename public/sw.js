@@ -24,11 +24,18 @@ self.addEventListener('push', (event) => {
   })());
 });
 
+// Ouvre la bonne page au toucher de l'alerte. Sur iPhone, `navigate()` échoue souvent sur l'app déjà ouverte :
+// on demande alors à la page de changer d'adresse elle-même, et en dernier recours on ouvre une fenêtre.
 async function openUrl(link) {
-  const url = new URL(link || '/', self.location.origin).href;
-  const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const w of wins) { if (new URL(w.url).origin === self.location.origin) { await w.focus(); return w.navigate(url); } }
-  return self.clients.openWindow(url);
+  const url = new URL(link || '/livreur', self.location.origin).href;
+  const wins = (await self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+    .filter((w) => new URL(w.url).origin === self.location.origin);
+  const w = wins.find((c) => c.focused) || wins[0];
+  if (!w) return self.clients.openWindow(url);
+  try { await w.focus(); } catch { /* déjà au premier plan */ }
+  w.postMessage({ type: 'navigate', url });
+  try { const r = await w.navigate(url); if (r) return r; } catch { /* iPhone : la page s'en charge via le message */ }
+  return w;
 }
 
 self.addEventListener('notificationclick', (event) => {

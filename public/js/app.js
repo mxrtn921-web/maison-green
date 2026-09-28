@@ -360,6 +360,10 @@
     const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
     const b64ToBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4); const raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
     let pushState = 'unknown';
+    // Toucher une alerte : le service worker demande d'ouvrir la course (indispensable sur iPhone).
+    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data?.type === 'navigate' && e.data.url && e.data.url !== location.href) location.href = e.data.url;
+    });
     const swReady = pushSupported ? navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).catch(() => null) : Promise.resolve(null);
     async function pushUi() {
       const banner = $('[data-push-banner]'); if (!banner) return;
