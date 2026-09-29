@@ -24,17 +24,41 @@ self.addEventListener('push', (event) => {
   })());
 });
 
-// Ouvre la bonne page au toucher de l'alerte. Sur iPhone, `navigate()` échoue souvent sur l'app déjà ouverte :
-// on demande alors à la page de changer d'adresse elle-même, et en dernier recours on ouvre une fenêtre.
+// Ouvre la bonne page au toucher de l'alerte.
+// iPhone : `navigate()` sur l'app déjà ouverte donne souvent un écran blanc, et une app fermée peut se rouvrir
+// sur la page d'accueil au lieu de la course. Donc : 1) on mémorise la page à ouvrir (la page la réclame dès
+// qu'elle s'affiche), 2) on prévient la page déjà ouverte par message, 3) sinon on ouvre une fenêtre.
+const NAV_CACHE = 'mg-nav';
+const NAV_KEY = '/__mg/pending-nav';
+async function rememberNav(url) {
+  try { const c = await caches.open(NAV_CACHE); await c.put(NAV_KEY, new Response(JSON.stringify({ url, at: Date.now() }), { headers: { 'Content-Type': 'application/json' } })); } catch { /* stockage indisponible */ }
+}
+async function takeNav() {
+  try {
+    const c = await caches.open(NAV_CACHE); const r = await c.match(NAV_KEY);
+    if (!r) return null;
+    await c.delete(NAV_KEY);
+    const v = await r.json();
+    return Date.now() - v.at < 3 * 60e3 ? v.url : null;
+  } catch { return null; }
+}
+self.addEventListener('fetch', (event) => {
+  if (new URL(event.request.url).pathname !== NAV_KEY) return; // tout le reste passe normalement
+  event.respondWith(takeNav().then((url) => new Response(JSON.stringify({ url }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })));
+});
+
 async function openUrl(link) {
   const url = new URL(link || '/livreur', self.location.origin).href;
+  await rememberNav(url);
   const wins = (await self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
     .filter((w) => new URL(w.url).origin === self.location.origin);
-  const w = wins.find((c) => c.focused) || wins[0];
-  if (!w) return self.clients.openWindow(url);
+  const w = wins.find((c) => c.focused) || wins.find((c) => c.visibilityState === 'visible') || wins[0];
+  if (!w) {
+    try { const opened = await self.clients.openWindow(url); if (opened) return opened; } catch { /* la page réclamera la course au démarrage */ }
+    return null;
+  }
   try { await w.focus(); } catch { /* déjà au premier plan */ }
   w.postMessage({ type: 'navigate', url });
-  try { const r = await w.navigate(url); if (r) return r; } catch { /* iPhone : la page s'en charge via le message */ }
   return w;
 }
 

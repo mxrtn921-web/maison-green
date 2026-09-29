@@ -14,6 +14,25 @@
     arrow: '<svg class="icon arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
     alert: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.8 19.5h18.4L12 4Z"/><path d="M12 10v4.5M12 17h.01"/></svg>',
   };
+  // ——— Toucher une alerte push : ouvrir la bonne page (course, commande) ———————————
+  // Le service worker envoie un message à la page ouverte ; si l'app était fermée ou en veille (iPhone),
+  // la page réclame elle-même la course mémorisée dès qu'elle s'affiche.
+  if ('serviceWorker' in navigator) {
+    const go = (url) => {
+      if (!url) return;
+      const target = new URL(url, location.origin);
+      if (target.origin !== location.origin) return;
+      if (target.pathname + target.search !== location.pathname + location.search) location.replace(target.href);
+    };
+    navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'navigate') { fetch('/__mg/pending-nav', { cache: 'no-store' }).catch(() => {}); go(e.data.url); } });
+    const claim = () => {
+      if (!navigator.serviceWorker.controller) return;
+      fetch('/__mg/pending-nav', { cache: 'no-store' }).then((r) => r.json()).then((d) => go(d.url)).catch(() => {});
+    };
+    claim();
+    addEventListener('pageshow', claim);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') claim(); });
+  }
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   async function api(url, body) {
     const r = await fetch(url, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json', Accept: 'application/json' } : { Accept: 'application/json' }, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
@@ -359,11 +378,7 @@
     const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
     const b64ToBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4); const raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
     let pushState = 'unknown';
-    // Toucher une alerte : le service worker demande d'ouvrir la course (indispensable sur iPhone).
-    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => {
-      if (e.data?.type === 'navigate' && e.data.url && e.data.url !== location.href) location.href = e.data.url;
-    });
-    const swReady = pushSupported ? navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).catch(() => null) : Promise.resolve(null);
+    const swReady = pushSupported ? navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then((reg) => { reg.update().catch(() => {}); return navigator.serviceWorker.ready; }).catch(() => null) : Promise.resolve(null);
     async function pushUi() {
       const banner = $('[data-push-banner]'); if (!banner) return;
       const text = $('[data-push-text]', banner); const btn = $('[data-push-enable]', banner);

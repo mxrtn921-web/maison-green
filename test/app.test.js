@@ -111,6 +111,13 @@ test('parcours complet carte : client → livreur → livrée, sans espèces', a
   const notes = (await driver.get('/api/notifications')).data;
   assert.equal(notes[0].kind, 'delivery_available');
   assert.equal(notes[0].order_id, id);
+  // toucher l'alerte ouvre la course (lien de la notification) : page affichée avec Accepter / Refuser
+  assert.equal(notes[0].link, `/livreur/courses/${id}`);
+  const fromPush = await driver.get(notes[0].link);
+  assert.equal(fromPush.status, 200);
+  assert.match(fromPush.text, /Accepter/); assert.match(fromPush.text, /Refuser/);
+  const sw = await driver.get('/sw.js');
+  assert.equal(sw.status, 200); assert.match(sw.text, /pending-nav/);
   // le livreur accepte depuis la notification (bouton « Accepter »)
   const acc = await driver.post(`/api/livreur/courses/${id}/accept`, { json: {} });
   assert.equal(acc.status, 200, JSON.stringify(acc.data));
