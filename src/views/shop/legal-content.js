@@ -5,7 +5,7 @@ export const LEGAL = {
     title: 'Mentions légales',
     sections: [
       ['Éditeur du site', ['Maison Green, [forme juridique] au capital de [montant] €, immatriculée au RCS de Rouen sous le numéro [SIREN], dont le siège est situé {adresse}.', 'Numéro de TVA intracommunautaire : [à compléter]. Directeur de la publication : [nom du gérant].', 'Contact : {contact}.']],
-      ['Hébergement', ['[Nom de l’hébergeur, adresse, téléphone] — par exemple Render, Railway, Scaleway ou OVHcloud.']],
+      ['Hébergement', ['Le site est hébergé par Railway Corporation, San Francisco, Californie (États-Unis) — https://railway.com.']],
       ['Propriété intellectuelle', ['La marque Maison Green, son logo et les contenus du site sont la propriété de Maison Green. Toute reproduction sans autorisation est interdite.']],
     ],
   },

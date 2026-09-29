@@ -1,6 +1,7 @@
 // Composants d'interface partagés : icônes, logo, étiquettes produit, badges, mises en page.
 import { html, raw, money, esc } from '../lib/html.js';
 import { STATUS, PAYMENT_STATUS } from '../services/orders.js';
+import { config } from '../config.js';
 
 const P = {
   bag: '<path d="M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 8Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
@@ -124,8 +125,18 @@ export function doc({ title, description = '', body, bodyClass = '', head = '', 
 ${robots ? html`<meta name="robots" content="${robots}">` : ''}
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="manifest" href="${manifest}">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Maison Green">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:title" content="${title ? `${title} — Maison Green` : 'Maison Green — votre épicerie livrée à Rouen'}">
+<meta property="og:description" content="${description || 'Fruits et légumes, produits frais et essentiels du quotidien, livrés chez vous à Rouen dans le créneau de votre choix.'}">
+<meta property="og:image" content="${config.baseUrl}/img/og-image.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="/fonts/Lora-Variable.woff" as="font" type="font/woff" crossorigin>
 <link rel="stylesheet" href="/css/app.css?v=${ASSET_V}">
 ${head}

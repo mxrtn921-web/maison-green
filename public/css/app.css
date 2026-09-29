@@ -721,3 +721,15 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
 @media (min-width: 1000px) { .sidebar .pro-tag { display: none; } }
 .input[type="file"] { padding: 8px; font-size: 14px; min-height: 0; }
 .input[type="file"]::file-selector-button { font: inherit; font-weight: 600; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 8px; padding: 7px 12px; margin-right: 12px; cursor: pointer; }
+
+/* Écrans tactiles : cibles d'au moins 44 px pour le doigt (recommandation Apple / WCAG 2.5.5). */
+@media (pointer: coarse) {
+  .add-btn, .chip, .btn-sm { height: 44px; min-height: 44px; }
+  .add-btn { min-width: 44px; }
+  .stepper { height: 44px; }
+  .stepper button { width: 44px; height: 44px; }
+  .line .stepper { height: 40px; }
+  .line .stepper button { width: 40px; height: 40px; }
+  .seg a { padding: 11px 14px; }
+  .slot-chip button { width: 32px; height: 32px; }
+}
