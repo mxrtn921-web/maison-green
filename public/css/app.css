@@ -733,3 +733,9 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
   .seg a { padding: 11px 14px; }
   .slot-chip button { width: 32px; height: 32px; }
 }
+
+/* Rappel « Suivre ma commande » (client sans compte : lien gardé sur le téléphone) */
+.track-reminder { background: var(--paper); border-bottom: 1px solid var(--line); }
+.track-reminder .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; padding-top: 6px; padding-bottom: 6px; }
+.track-reminder a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--green); font-weight: 600; font-size: 15px; text-decoration: none; }
+.track-reminder a:hover span:first-child { text-decoration: underline; }

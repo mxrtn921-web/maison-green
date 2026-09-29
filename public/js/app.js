@@ -86,6 +86,27 @@
     const img = document.createElement('img'); img.alt = 'Aperçu'; img.src = URL.createObjectURL(inp.files[0]); tag.appendChild(img);
   });
 
+  // ——— Mes commandes (sans compte) : le téléphone garde le lien de suivi ———————————
+  // Le client retrouve sa commande en rouvrant le site, sans e-mail ni compte.
+  const ORDERS_KEY = 'mg_orders_v1'; const KEEP_MS = 3 * 864e5;
+  const savedOrders = () => { try { const v = JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]'); return Array.isArray(v) ? v.filter((o) => o && o.token && Date.now() - o.at < KEEP_MS) : []; } catch { return []; } };
+  const trackMatch = /^\/suivi\/([A-Za-z0-9_-]{10,64})$/.exec(location.pathname);
+  if (trackMatch) {
+    const number = (/Commande (MG-\d+)/.exec(document.body.textContent) || [])[1] || '';
+    const list = savedOrders().filter((o) => o.token !== trackMatch[1]);
+    const prev = savedOrders().find((o) => o.token === trackMatch[1]);
+    list.unshift({ token: trackMatch[1], number, at: prev?.at || Date.now() });
+    try { localStorage.setItem(ORDERS_KEY, JSON.stringify(list.slice(0, 5))); } catch { /* navigation privée */ }
+  } else if (!$('[data-pro]') && !/^\/(admin|livreur|paiement-demo)/.test(location.pathname)) {
+    const mine = savedOrders();
+    const main = $('main#contenu');
+    if (mine.length && main) {
+      const bar = document.createElement('div'); bar.className = 'track-reminder';
+      bar.innerHTML = `<div class="wrap">${mine.slice(0, 2).map((o) => `<a href="/suivi/${esc(o.token)}"><span>Suivre ma commande${o.number ? ` <strong>${esc(o.number)}</strong>` : ''}</span><span aria-hidden="true">→</span></a>`).join('')}</div>`;
+      main.parentNode.insertBefore(bar, main);
+    }
+  }
+
   // ——— Panier ————————————————————————————————————————————————
   const KEY = 'mg_cart_v1';
   const cart = {
