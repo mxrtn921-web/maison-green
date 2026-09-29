@@ -10,6 +10,19 @@ export const LEGAL = {
       ['Propriété intellectuelle', ['La marque Maison Green, son logo et les contenus du site sont la propriété de Maison Green. Toute reproduction sans autorisation est interdite.']],
     ],
   },
+  '/cgu': {
+    title: 'Conditions générales d’utilisation',
+    sections: [
+      ['Objet', ['Les présentes conditions encadrent l’accès et l’utilisation du site Maison Green, que vous passiez commande ou non. En naviguant sur le site, vous les acceptez. Les achats sont régis par nos conditions générales de vente (lien « Conditions de vente » en bas de chaque page).']],
+      ['Accès au site', ['Le site est accessible gratuitement, 7 jours sur 7. Maison Green peut l’interrompre pour maintenance ou en cas de force majeure, sans que sa responsabilité puisse être engagée.']],
+      ['Compte client', ['La création d’un compte est facultative. Vous êtes responsable de la confidentialité de votre mot de passe et des informations que vous renseignez, qui doivent être exactes. Vous pouvez supprimer votre compte à tout moment depuis votre espace personnel.']],
+      ['Utilisation du site', ['Il est interdit d’utiliser le site de manière frauduleuse : fausses commandes, tentative d’intrusion, envoi automatisé de formulaires, collecte des données d’autres utilisateurs. Maison Green peut suspendre un compte ou refuser une commande en cas d’abus.']],
+      ['Responsabilité', ['Les photos et descriptions des produits sont les plus fidèles possible, sans valeur contractuelle pour les variations naturelles (taille, couleur, poids des produits frais). Maison Green n’est pas responsable des interruptions dues à votre connexion ou à votre appareil.']],
+      ['Propriété intellectuelle', ['Les textes, photos, logos et le design du site appartiennent à Maison Green. Toute reproduction, même partielle, est interdite sans autorisation écrite.']],
+      ['Données personnelles et cookies', ['Le traitement de vos données est détaillé dans notre politique de confidentialité (lien « Confidentialité » en bas de chaque page). Le site n’utilise que des cookies nécessaires à son fonctionnement et une mesure d’audience anonyme, sans cookie.']],
+      ['Droit applicable', ['Les présentes conditions sont soumises au droit français. En cas de litige, une solution amiable sera recherchée en priorité ({contact}).']],
+    ],
+  },
   '/cgv': {
     title: 'Conditions générales de vente',
     sections: [
@@ -28,6 +41,7 @@ export const LEGAL = {
       ['Données collectées et finalités', ['Identité, coordonnées, adresse de livraison et instructions : nécessaires à l’exécution de votre commande (base légale : contrat).', 'Historique de commandes : gestion du service client et obligations comptables (base légale : obligation légale).', 'Adresse e-mail pour les actualités : uniquement si vous l’avez accepté (base légale : consentement, retirable à tout moment).']],
       ['Destinataires', ['Nos équipes (préparation et livraison), notre prestataire de paiement Stripe (qui traite seul vos données bancaires) et notre hébergeur. Aucune donnée n’est vendue.']],
       ['Durées de conservation', ['Compte client : jusqu’à sa suppression, ou 3 ans après la dernière commande. Commandes : 10 ans (obligation comptable), anonymisées si vous supprimez votre compte. Commandes sans compte : 3 ans.']],
+      ['Mesure d’audience', ['Nous comptons les pages vues de façon anonyme, sans cookie et sans conserver votre adresse IP : seuls des totaux (pages consultées, type d’appareil, site d’origine) sont enregistrés, pour améliorer le site. Cette mesure est exemptée de consentement (recommandations de la CNIL).']],
       ['Cookies', ['Nous n’utilisons qu’un cookie de session strictement nécessaire (connexion) et le stockage local de votre navigateur pour mémoriser votre panier. Aucun cookie publicitaire ni de mesure d’audience : aucun bandeau de consentement n’est donc nécessaire.']],
       ['Vos droits', ['Vous disposez des droits d’accès, de rectification, d’effacement, de portabilité, de limitation et d’opposition. Depuis votre compte, vous pouvez exporter vos données et supprimer votre compte en un clic. Vous pouvez aussi nous écrire, ou saisir la CNIL (cnil.fr).']],
       ['Sécurité', ['Mots de passe chiffrés (scrypt), connexions sécurisées (HTTPS), accès aux données limité par rôle, paiements traités par un prestataire certifié PCI-DSS.']],

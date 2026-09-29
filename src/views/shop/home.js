@@ -16,7 +16,7 @@ export function homePage(ctx, { categories, featured, zones, hours, state, shelf
       <p class="lede">Fruits et légumes, produits frais, épicerie fine et essentiels du quotidien. Choisis au comptoir de la rue de la République, livrés dans tout Rouen par notre équipe.</p>
       <div class="hero-cta">
         <a class="btn btn-primary btn-lg" href="/boutique">Commander maintenant <span class="arrow">${icon('arrow')}</span></a>
-        <a class="btn btn-ghost btn-lg" href="#livraison">Zones de livraison</a>
+        <a class="hero-link" href="#livraison">Voir les zones de livraison</a>
       </div>
       <div class="hero-meta">
         <span>${icon('clock')}${state.accepting ? html`Prochain créneau : ${state.nextSlot.dayLabel.toLowerCase()}, ${state.nextSlot.label}` : 'Commandes momentanément fermées'}</span>

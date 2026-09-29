@@ -124,6 +124,7 @@ export function doc({ title, description = '', body, bodyClass = '', head = '', 
 <meta name="description" content="${description || 'Maison Green, épicerie de quartier à Rouen. Fruits et légumes, produits frais, épicerie fine et essentiels du quotidien livrés chez vous, dans le créneau de votre choix.'}">
 ${robots ? html`<meta name="robots" content="${robots}">` : ''}
 <meta name="theme-color" content="#ffffff">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="manifest" href="${manifest}">

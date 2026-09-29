@@ -2,9 +2,10 @@
 import http from 'node:http';
 import path from 'node:path';
 import { config, ROOT, stripeEnabled } from './src/config.js';
+import { track } from './src/services/analytics.js';
 import { run, one } from './src/db.js';
 import { match } from './src/router.js';
-import { readBody, serveStatic, sendJson, sendHtml, redirect, takeFlash, HttpError } from './src/lib/http.js';
+import { readBody, serveStatic, sendJson, sendHtml, redirect, takeFlash, HttpError, clientIp } from './src/lib/http.js';
 import { currentUser } from './src/auth.js';
 import { expireUnpaidOrders } from './src/services/orders.js';
 import { errorPage } from './src/views/shop/account.js';
@@ -55,6 +56,11 @@ function sameOrigin(req) {
 const server = http.createServer(async (req, res) => {
   for (const [k, val] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, val);
   const url = new URL(req.url, 'http://localhost');
+  // HTTPS obligatoire : toute visite en http:// est renvoyée vers https:// (sauf en local).
+  if (config.isProd && req.headers['x-forwarded-proto'] === 'http') {
+    res.writeHead(301, { Location: `https://${req.headers['x-forwarded-host'] || req.headers.host}${req.url}` });
+    return res.end();
+  }
   const isApi = url.pathname.startsWith('/api/');
   const ctx = { req, res, url, query: url.searchParams, params: {}, body: {}, files: {}, rawBody: '', user: null, flash: null };
   try {
@@ -73,6 +79,7 @@ const server = http.createServer(async (req, res) => {
       ctx.flash = takeFlash(req, res);
     }
     await m.handler(ctx);
+    if (req.method === 'GET' && !isApi && res.statusCode === 200) track(req, url, clientIp(req)); // statistiques anonymes
   } catch (err) {
     const status = err instanceof HttpError ? err.status : 500;
     if (status >= 500) console.error(err);

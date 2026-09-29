@@ -84,7 +84,33 @@
     if (!tag) return;
     tag.classList.add('photo'); tag.innerHTML = '';
     const img = document.createElement('img'); img.alt = 'Aperçu'; img.src = URL.createObjectURL(inp.files[0]); tag.appendChild(img);
+    compressImage(inp);
   });
+
+  // Compression des photos avant envoi : 1200 px maximum, WebP (ou JPEG sur les vieux iPhone).
+  // Une photo de téléphone de 3-5 Mo devient ~100-250 Ko : pages plus rapides et moins de stockage.
+  async function compressImage(inp) {
+    const file = inp.files[0];
+    if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type) || !window.createImageBitmap || !window.DataTransfer) return;
+    const form = inp.form; const buttons = form ? $$('button[type="submit"], button:not([type])', form) : [];
+    buttons.forEach((b) => { b.disabled = true; });
+    try {
+      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const scale = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale);
+      const g = canvas.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, canvas.width, canvas.height); g.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const toBlob = (type, q) => new Promise((ok) => canvas.toBlob(ok, type, q));
+      let blob = await toBlob('image/webp', 0.82);
+      if (!blob || blob.type !== 'image/webp') blob = await toBlob('image/jpeg', 0.85);
+      if (blob && blob.size < file.size) {
+        const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+        const dt = new DataTransfer(); dt.items.add(new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'photo'}.${ext}`, { type: blob.type }));
+        inp.files = dt.files;
+      }
+    } catch { /* on garde le fichier d'origine */ }
+    buttons.forEach((b) => { b.disabled = false; });
+  }
 
   // ——— Mes commandes (sans compte) : le téléphone garde le lien de suivi ———————————
   // Le client retrouve sa commande en rouvrant le site, sans e-mail ni compte.
@@ -104,6 +130,17 @@
       const bar = document.createElement('div'); bar.className = 'track-reminder';
       bar.innerHTML = `<div class="wrap">${mine.slice(0, 2).map((o) => `<a href="/suivi/${esc(o.token)}"><span>Suivre ma commande${o.number ? ` <strong>${esc(o.number)}</strong>` : ''}</span><span aria-hidden="true">→</span></a>`).join('')}</div>`;
       main.parentNode.insertBefore(bar, main);
+    }
+  }
+
+  // ——— Bandeau cookies : information (le site n'utilise aucun traceur, donc aucun consentement à demander) ———
+  if (!$('[data-pro]')) {
+    let seenNote = false; try { seenNote = localStorage.getItem('mg_cookie_note') === '1'; } catch { seenNote = true; }
+    if (!seenNote) {
+      const note = document.createElement('div'); note.className = 'cookie-note'; note.setAttribute('role', 'region'); note.setAttribute('aria-label', 'Cookies');
+      note.innerHTML = '<span>Ici, pas de pub ni de pistage : uniquement les cookies nécessaires (connexion, panier) et une mesure d’audience anonyme. <a href="/confidentialite">En savoir plus</a></span><button type="button">OK</button>';
+      $('button', note).addEventListener('click', () => { try { localStorage.setItem('mg_cookie_note', '1'); } catch { /* navigation privée */ } note.remove(); });
+      document.body.appendChild(note);
     }
   }
 

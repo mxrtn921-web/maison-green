@@ -1,6 +1,6 @@
 // Comptes clients : inscription, connexion, profil, adresses, RGPD. Pages légales.
 import { get, post } from '../router.js';
-import { sendHtml, redirect, setFlash, HttpError, send } from '../lib/http.js';
+import { sendHtml, redirect, setFlash, HttpError, send, clientIp, isBot } from '../lib/http.js';
 import { one, all, run, tx, nowIso } from '../db.js';
 import { validate, v } from '../lib/validate.js';
 import { authenticate, startSession, endSession, hashPassword, verifyPassword, requireRole, rateLimit, resetRateLimit, revokeAllSessions } from '../auth.js';
@@ -19,10 +19,10 @@ get('/connexion', (ctx) => {
 });
 
 post('/connexion', (ctx) => {
-  const ip = ctx.req.socket.remoteAddress;
+  const ip = clientIp(ctx.req);
   const email = String(ctx.body.email || '').slice(0, 160);
   const next = safeNext(ctx.body.suite);
-  try { rateLimit(`login:${ip}`, 20); rateLimit(`login:${email.toLowerCase()}`, 8); }
+  try { rateLimit(`login:${ip}`, 40); rateLimit(`login:${email.toLowerCase()}`, 8); }
   catch (e) { return sendHtml(ctx.res, loginPage(ctx, { errors: { form: e.message }, values: { email }, next }), 429); }
   const pwd = String(ctx.body.password || '');
   // Espace ajouté par un copier-coller ou le clavier du téléphone : on retente sans.
@@ -39,8 +39,9 @@ get('/inscription', (ctx) => {
 });
 
 post('/inscription', (ctx) => {
-  rateLimit(`register:${ctx.req.socket.remoteAddress}`, 10, 60 * 60e3);
+  rateLimit(`register:${clientIp(ctx.req)}`, 10, 60 * 60e3);
   const next = safeNext(ctx.body.suite);
+  if (isBot(ctx.body)) return sendHtml(ctx.res, registerPage(ctx, { errors: { form: 'Inscription refusée.' }, values: {}, next }), 422);
   const { data, errors } = validate({
     first_name: v.text({ label: 'Le prénom', max: 60 }), last_name: v.text({ label: 'Le nom', max: 60 }),
     email: v.email(), phone: v.phone({ required: false }), password: v.password(), marketing_opt_in: v.bool(), accept: v.bool(),

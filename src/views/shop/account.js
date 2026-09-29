@@ -30,6 +30,7 @@ export function registerPage(ctx, { errors = {}, values = {}, next = '' }) {
     ${errors.form ? html`<div class="notice notice-error mt-24" role="alert">${icon('alert')}<span>${errors.form}</span></div>` : ''}
     <form method="post" action="/inscription" novalidate>
       <input type="hidden" name="suite" value="${next}">
+      <div class="hp" aria-hidden="true"><label for="hp-website">Laissez ce champ vide</label><input id="hp-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
       <div class="grid-2">
         <div class="${f(errors, 'first_name')}"><label for="first_name">Prénom</label><input class="input" id="first_name" name="first_name" autocomplete="given-name" required value="${values.first_name || ''}">${fieldErr(errors, 'first_name')}</div>
         <div class="${f(errors, 'last_name')}"><label for="last_name">Nom</label><input class="input" id="last_name" name="last_name" autocomplete="family-name" required value="${values.last_name || ''}">${fieldErr(errors, 'last_name')}</div>

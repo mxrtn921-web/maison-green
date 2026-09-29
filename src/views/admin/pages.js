@@ -558,3 +558,50 @@ export function driversPage(ctx, { drivers, errors = {}, values = {}, created = 
   </section>`;
   return adminLayout(ctx, { title: 'Livreurs', active: 'drivers', body });
 }
+
+// ——— Statistiques de fréquentation (anonymes, sans cookie) ———————————————————
+export function statsPage(ctx, { r, days }) {
+  const max = Math.max(...r.series.map((d) => d.visitors), 1);
+  const nf = (n) => new Intl.NumberFormat('fr-FR').format(n);
+  const short = (day) => `${Number(day.slice(8))}/${Number(day.slice(5, 7))}`;
+  const label = (day) => new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`));
+  const names = Object.fromEntries(r.pages.filter((p) => p.name).map((p) => [p.key, p.name]));
+  const pageName = (p) => (p === '/' ? 'Accueil' : p === '/boutique' ? 'Boutique' : p.startsWith('/boutique?categorie=') ? `Rayon : ${decodeURIComponent(p.split('=')[1])}` : p.startsWith('/produit/') ? `Produit : ${names[p] || decodeURIComponent(p.slice(9))}` : p);
+  const list = (items, total, fmt = (k) => k) => (items.length ? html`<table class="table"><tbody>${items.map((i) => html`<tr><td>${fmt(i.key)}</td><td class="r num">${nf(i.n)}</td><td class="r small muted" style="width:64px;white-space:nowrap">${total ? Math.round((i.n / total) * 100) : 0} %</td></tr>`)}</tbody></table>`
+    : html`<p class="panel-body small muted">Pas encore de données.</p>`);
+  const totalDevices = r.devices.reduce((s, d) => s + d.n, 0); const totalSources = r.sources.reduce((s, d) => s + d.n, 0);
+  const body = html`
+  <div class="pro-head">
+    <div><h1 class="h1">Statistiques</h1><p>Fréquentation de la boutique en ligne, mesurée de façon anonyme (sans cookie, sans adresse IP).</p></div>
+    <nav class="seg" aria-label="Période">${[7, 30, 90].map((n) => html`<a href="/admin/statistiques?jours=${n}" aria-current="${days === n}">${n} jours</a>`)}</nav>
+  </div>
+  <div class="kpis">
+    <div class="kpi accent"><span class="k-label">Visiteurs</span><span class="k-value">${nf(r.visitors)}</span><span class="k-sub">sur ${days} jours</span></div>
+    <div class="kpi"><span class="k-label">Pages vues</span><span class="k-value">${nf(r.views)}</span><span class="k-sub">${r.visitors ? (r.views / r.visitors).toFixed(1).replace('.', ',') : '0'} par visiteur</span></div>
+    <div class="kpi"><span class="k-label">Commandes</span><span class="k-value">${nf(r.orders)}</span><span class="k-sub">payées, hors annulations</span></div>
+    <div class="kpi"><span class="k-label">Taux de conversion</span><span class="k-value">${r.conversion.toFixed(1).replace('.', ',')} %</span><span class="k-sub">visiteurs qui ont commandé</span></div>
+  </div>
+  <div class="panels mt-24">
+    <section class="panel">
+      <div class="panel-head"><h2>Visiteurs par jour</h2><span class="small muted">du ${label(r.start)} au ${label(r.end)}</span></div>
+      <div class="panel-body">
+        <div class="bars" role="img" aria-label="Nombre de visiteurs par jour sur ${days} jours">
+          ${r.series.map((d, i) => html`<div class="bar ${i === r.series.length - 1 ? 'today' : ''}" title="${label(d.day)} : ${d.visitors} visiteur${d.visitors > 1 ? 's' : ''}, ${d.views} pages vues, ${d.orders} commande${d.orders > 1 ? 's' : ''}">
+            ${i === r.series.length - 1 ? html`<span style="color:var(--ink);font-weight:600">${d.visitors}</span>` : ''}
+            <i style="height:${Math.round((d.visitors / max) * 100)}%"></i><span>${days <= 31 && (days <= 14 || i % 3 === 0) ? short(d.day) : ''}</span></div>`)}
+        </div>
+        <details class="mt-16 small"><summary class="muted" style="cursor:pointer">Voir les données</summary>
+          <table class="table mt-8"><thead><tr><th>Jour</th><th class="r">Visiteurs</th><th class="r">Pages vues</th><th class="r">Commandes</th></tr></thead>
+          <tbody>${[...r.series].reverse().map((d) => html`<tr><td>${label(d.day)}</td><td class="r">${d.visitors}</td><td class="r">${d.views}</td><td class="r">${d.orders}</td></tr>`)}</tbody></table>
+        </details>
+      </div>
+    </section>
+  </div>
+  <div class="stats-grid mt-24">
+    <section class="panel"><div class="panel-head"><h2>Pages les plus vues</h2></div>${list(r.pages, r.views, pageName)}</section>
+    <section class="panel"><div class="panel-head"><h2>D'où viennent les visiteurs</h2></div>${list(r.sources, totalSources)}</section>
+    <section class="panel"><div class="panel-head"><h2>Appareils</h2></div>${list(r.devices, totalDevices)}</section>
+  </div>
+  <p class="small muted mt-24">Astuce : pour savoir ce qui marche, ajoutez <code>?utm_source=instagram</code> (ou flyer, facebook…) à la fin du lien que vous partagez : la source apparaîtra ici.</p>`;
+  return adminLayout(ctx, { title: 'Statistiques', active: 'stats', body });
+}

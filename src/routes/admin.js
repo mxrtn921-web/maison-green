@@ -22,6 +22,7 @@ import * as CatalogImport from '../services/catalog-import.js';
 import { shopInfo } from '../lib/shop.js';
 import { years as reportYears, yearReport, yearOrders } from '../services/reports.js';
 import * as V from '../views/admin/pages.js';
+import * as Analytics from '../services/analytics.js';
 
 const admin = (ctx) => requireRole(ctx, 'admin');
 const ORDER_SELECT = `SELECT o.*, d.first_name AS driver_first_name FROM orders o LEFT JOIN users d ON d.id = o.driver_id`;
@@ -73,6 +74,11 @@ get('/admin', (ctx) => {
 // ——— Chiffre d'affaires ——————————————————————————————————————————
 
 const reportYear = (ctx) => { const ys = reportYears(); const y = Number(ctx.query.get('annee')); return ys.includes(y) ? y : ys[0]; };
+get('/admin/statistiques', (ctx) => {
+  admin(ctx);
+  const days = [7, 30, 90].includes(Number(ctx.query.get('jours'))) ? Number(ctx.query.get('jours')) : 30;
+  sendHtml(ctx.res, V.statsPage(ctx, { r: Analytics.report(days), days }));
+});
 get('/admin/chiffre-affaires', (ctx) => {
   admin(ctx);
   sendHtml(ctx.res, V.revenuePage(ctx, { report: yearReport(reportYear(ctx)), years: reportYears() }));
@@ -435,6 +441,7 @@ post('/admin/remise-a-zero', (ctx) => {
     for (const t of ['order_items', 'order_events', 'payments']) run(`DELETE FROM ${t}`);
     run('DELETE FROM notifications');
     run('DELETE FROM webhook_events');
+    Analytics.clearAnalytics(); // visites de test
     run('DELETE FROM orders');
     run("DELETE FROM sqlite_sequence WHERE name IN ('orders','order_items','order_events','payments','notifications')");
     if (ctx.body.customers) {

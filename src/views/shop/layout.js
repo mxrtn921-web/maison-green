@@ -61,6 +61,7 @@ ${flashBox(ctx.flash)}
           <li><a href="/boutique">Tous les produits</a></li>
           <li><a href="/#livraison">Zones et délais</a></li>
           <li><a href="/cgv">Conditions de vente</a></li>
+          <li><a href="/cgu">Conditions d'utilisation</a></li>
           <li><a href="/confidentialite">Confidentialité</a></li>
           <li><a href="/mentions-legales">Mentions légales</a></li>
         </ul>

@@ -1,6 +1,7 @@
 // Routes côté client : pages boutique, commande, suivi, API panier.
 import { get, post } from '../router.js';
-import { sendHtml, sendJson, redirect, setFlash, HttpError } from '../lib/http.js';
+import { sendHtml, sendJson, redirect, setFlash, HttpError, clientIp, isBot } from '../lib/http.js';
+import { rateLimit } from '../auth.js';
 import { subscribe } from '../lib/events.js';
 import { all } from '../db.js';
 import { categories, shopProducts, featuredProducts, productBySlug, quoteCart } from '../services/catalog.js';
@@ -11,8 +12,23 @@ import { homePage } from '../views/shop/home.js';
 import { catalogPage, productPage } from '../views/shop/catalog.js';
 import { checkoutPage, demoPaymentPage } from '../views/shop/checkout.js';
 import { trackPage } from '../views/shop/track.js';
-import { stripeEnabled } from '../config.js';
+import { stripeEnabled, config } from '../config.js';
+import { send } from '../lib/http.js';
 import { money } from '../lib/html.js';
+
+// ——— Référencement : robots.txt et plan du site (sitemap.xml) ————————————————
+get('/robots.txt', (ctx) => send(ctx.res, 200, ['User-agent: *', 'Allow: /', 'Disallow: /admin', 'Disallow: /livreur', 'Disallow: /compte', 'Disallow: /suivi',
+  'Disallow: /commande', 'Disallow: /paiement-demo', 'Disallow: /api', '', `Sitemap: ${config.baseUrl}/sitemap.xml`, ''].join('\n'), 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=3600' }));
+get('/sitemap.xml', (ctx) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = [['/', 'daily', '1.0'], ['/boutique', 'daily', '0.9'],
+    ...categories({ withCounts: true }).filter((c) => c.product_count > 0).map((c) => [`/boutique?categorie=${encodeURIComponent(c.slug)}`, 'weekly', '0.7']),
+    ...shopProducts().map((p) => [`/produit/${encodeURIComponent(p.slug)}`, 'weekly', '0.6']),
+    ['/cgv', 'yearly', '0.2'], ['/cgu', 'yearly', '0.2'], ['/confidentialite', 'yearly', '0.2'], ['/mentions-legales', 'yearly', '0.2']];
+  const xmlEsc = (v) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([u, f, pr]) => `  <url><loc>${xmlEsc(config.baseUrl + u)}</loc><lastmod>${today}</lastmod><changefreq>${f}</changefreq><priority>${pr}</priority></url>`).join('\n')}\n</urlset>\n`;
+  send(ctx.res, 200, body, 'application/xml; charset=utf-8', { 'Cache-Control': 'public, max-age=3600' });
+});
 
 get('/', (ctx) => {
   const cats = categories({ withCounts: true }).filter((c) => c.product_count > 0);
@@ -62,6 +78,9 @@ get('/api/zone', (ctx) => {
 });
 
 post('/api/orders', async (ctx) => {
+  // Anti-spam : champ piège rempli (robot) ou trop de commandes depuis la même connexion.
+  if (isBot(ctx.body)) return sendJson(ctx.res, { message: 'Commande refusée.', errors: {} }, 422);
+  rateLimit(`order:${clientIp(ctx.req)}`, 30, 10 * 60e3);
   try {
     const { order } = createOrder(ctx.body, ctx.user?.role === 'customer' ? ctx.user : null);
     try {

@@ -235,3 +235,13 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   auth        TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
+
+-- Mesure d'audience anonyme (sans cookie, sans adresse IP) : uniquement des totaux par jour.
+-- dim : 'total' (key 'views' | 'visitors'), 'page', 'source', 'device'.
+CREATE TABLE IF NOT EXISTS analytics_daily (
+  day  TEXT NOT NULL,
+  dim  TEXT NOT NULL,
+  key  TEXT NOT NULL,
+  n    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, dim, key)
+);

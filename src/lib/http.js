@@ -1,5 +1,6 @@
 // Outils HTTP : lecture du corps (formulaire, JSON, multipart), cookies, réponses, fichiers statiques.
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { config } from '../config.js';
@@ -91,12 +92,30 @@ export async function readBody(req) {
   return { fields: parseForm(raw), files: {}, raw };
 }
 
+// Compression gzip des réponses texte (pages 3 à 5 fois plus légères sur mobile).
+const COMPRESSIBLE = /^(text\/|application\/(json|javascript|manifest\+json|xml)|image\/svg\+xml)/;
+const acceptsGzip = (res) => /\bgzip\b/.test(res.req?.headers?.['accept-encoding'] || '');
 export function send(res, status, body, type = 'text/html; charset=utf-8', headers = {}) {
-  res.writeHead(status, { 'Content-Type': type, ...headers });
-  res.end(body);
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body ?? ''));
+  if (buf.length > 1024 && COMPRESSIBLE.test(type) && acceptsGzip(res)) {
+    const gz = zlib.gzipSync(buf, { level: 6 });
+    res.writeHead(status, { 'Content-Type': type, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding', 'Content-Length': gz.length, ...headers });
+    return res.end(res.req?.method === 'HEAD' ? undefined : gz);
+  }
+  res.writeHead(status, { 'Content-Type': type, 'Content-Length': buf.length, ...headers });
+  res.end(res.req?.method === 'HEAD' ? undefined : buf);
 }
 export const sendHtml = (res, body, status = 200) => send(res, status, String(body));
 export const sendJson = (res, data, status = 200) => send(res, status, JSON.stringify(data), 'application/json; charset=utf-8', { 'Cache-Control': 'no-store' });
+/** Adresse IP du visiteur. En production (Railway), la vraie adresse est dans X-Forwarded-For :
+ *  sans ça, tous les visiteurs auraient l'adresse du proxy et partageraient les mêmes limites anti-abus. */
+export function clientIp(req) {
+  const fwd = config.isProd ? String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() : '';
+  return fwd || req.socket?.remoteAddress || '';
+}
+/** Champ piège anti-robots : invisible pour un humain, rempli automatiquement par les robots de spam. */
+export const isBot = (body) => Boolean(body && String(body.website || '').trim());
+
 export function redirect(res, location, status = 303) { res.writeHead(status, { Location: location }); res.end(); }
 
 // Messages « flash » signés (affichés une fois après une redirection)
@@ -119,8 +138,9 @@ const MIME = {
   '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.woff': 'font/woff', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.json': 'application/json',
-  '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8',
+  '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8',
 };
+const gzCache = new Map(); // fichier → { mtime, gz }
 export function serveStatic(req, res, publicDir) {
   const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   const file = path.normalize(path.join(publicDir, url));
@@ -129,13 +149,18 @@ export function serveStatic(req, res, publicDir) {
   try { stat = fs.statSync(file); } catch { return false; }
   if (!stat.isFile()) return false;
   const ext = path.extname(file).toLowerCase();
-  const immutable = url.startsWith('/fonts/') || url.startsWith('/uploads/');
-  res.writeHead(200, {
-    'Content-Type': MIME[ext] || 'application/octet-stream',
-    'Content-Length': stat.size,
-    'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=300',
-    'X-Content-Type-Options': 'nosniff',
-  });
+  const type = MIME[ext] || 'application/octet-stream';
+  // Fichiers versionnés (?v=…), polices et photos : gardés 1 an par le navigateur. Le reste : 5 minutes.
+  const versioned = /[?&]v=/.test(req.url) && (ext === '.css' || ext === '.js');
+  const immutable = versioned || url.startsWith('/fonts/') || url.startsWith('/uploads/') || /^\/img\/.+\.png$/.test(url);
+  const headers = { 'Content-Type': type, 'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : (url === '/sw.js' ? 'no-cache' : 'public, max-age=300'), 'X-Content-Type-Options': 'nosniff' };
+  if (COMPRESSIBLE.test(type) && stat.size > 1024 && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+    let c = gzCache.get(file);
+    if (!c || c.mtime !== stat.mtimeMs) { c = { mtime: stat.mtimeMs, gz: zlib.gzipSync(fs.readFileSync(file), { level: 9 }) }; gzCache.set(file, c); }
+    res.writeHead(200, { ...headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding', 'Content-Length': c.gz.length });
+    return res.end(req.method === 'HEAD' ? undefined : c.gz), true;
+  }
+  res.writeHead(200, { ...headers, 'Content-Length': stat.size });
   if (req.method === 'HEAD') return res.end(), true;
   fs.createReadStream(file).pipe(res);
   return true;

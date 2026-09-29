@@ -15,7 +15,7 @@
   --line-strong: #d9d6ce;
   --ink: #17181a;
   --ink-2: #45484d;
-  --ink-3: #6b6e73;
+  --ink-3: #62656a; /* ≥ 4,9:1 sur tous les fonds (WCAG AA) */
   --green: #1e3b2f;
   --green-hover: #162d24;
   --green-2: #3d6b54;
@@ -739,3 +739,21 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
 .track-reminder .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; padding-top: 6px; padding-bottom: 6px; }
 .track-reminder a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--green); font-weight: 600; font-size: 15px; text-decoration: none; }
 .track-reminder a:hover span:first-child { text-decoration: underline; }
+
+/* Accueil : un seul bouton principal, le lien secondaire reste discret */
+.hero-cta { align-items: center; gap: 12px 24px; }
+.hero-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink-2); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line-strong); }
+.hero-link:hover { color: var(--ink); text-decoration-color: currentColor; }
+
+/* Bandeau d'information cookies (aucun traceur : information, pas de consentement à recueillir) */
+.cookie-note { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 60; max-width: 560px; margin: 0 auto; display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: var(--ink); color: #eef2ef; border-radius: var(--r); box-shadow: 0 8px 30px rgba(0,0,0,.18); font-size: 14px; line-height: 1.45; }
+.cookie-note a { color: #fff; text-decoration: underline; }
+.cookie-note button { flex: none; min-height: 44px; padding: 0 16px; border: 0; border-radius: 99px; background: #fff; color: var(--ink); font-weight: 700; cursor: pointer; }
+body:has(.cart-bar:not([hidden])) .cookie-note { bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+/* Champ piège anti-spam : hors de l'écran, ignoré par les lecteurs d'écran */
+.hp { position: absolute !important; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+/* Statistiques : trois tableaux alignés */
+.stats-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; }
+.stats-grid > .panel { margin: 0; }

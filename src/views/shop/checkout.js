@@ -64,6 +64,7 @@ export function checkoutPage(ctx, { days, zones, addresses, state }) {
         <div class="pay-options" role="radiogroup" aria-label="Mode de paiement">
           <div class="pay"><input type="radio" name="payment_method" id="pm-card" value="card" checked><label for="pm-card"><span class="t">Carte bancaire</span><span class="brands"><span>CB</span><span>VISA</span><span>MC</span></span><span class="d">Paiement sécurisé sur la page Stripe. Vos données bancaires ne sont jamais stockées par Maison Green.${stripeEnabled() ? '' : ' (Mode démo : aucun débit réel)'}</span></label></div>
         </div>
+        <div class="hp" aria-hidden="true"><label for="hp-website">Laissez ce champ vide</label><input id="hp-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
         <label class="check mt-24"><input type="checkbox" name="accept_terms" required> <span>J'accepte les <a class="link" href="/cgv" target="_blank">conditions générales de vente</a> et la <a class="link" href="/confidentialite" target="_blank">politique de confidentialité</a>.</span></label>
         <p class="error-text mt-8" data-err="accept_terms" hidden></p>
       </section>

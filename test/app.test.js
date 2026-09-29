@@ -441,6 +441,44 @@ test('admin : nouveau mot de passe pour un livreur', async () => {
   assert.equal((await client().post(`/admin/livreurs/${id}/mot-de-passe`)).status, 303, 'réservé à l’admin');
 });
 
+test('qualité du site : CGU, sitemap, robots, compression, favicon, anti-spam, statistiques anonymes', async () => {
+  const c = client();
+  // pages légales et référencement
+  const cgu = await c.get('/cgu'); assert.equal(cgu.status, 200); assert.match(cgu.text, /Conditions générales d’utilisation/);
+  assert.match((await c.get('/')).text, /href="\/cgu"/);
+  const robots = await c.get('/robots.txt'); assert.equal(robots.status, 200);
+  assert.match(robots.text, /Disallow: \/admin/); assert.match(robots.text, new RegExp(`Sitemap: ${BASE}/sitemap.xml`));
+  const sm = await c.get('/sitemap.xml'); assert.equal(sm.status, 200);
+  assert.match(sm.text, /<urlset/);
+  const slug = /\/produit\/([a-z0-9-]+)</.exec(sm.text)[1]; assert.doesNotMatch(sm.text, /\/admin/);
+  assert.equal((await c.get('/favicon.ico')).status, 200);
+  // compression gzip des pages et fichiers, cache long des fichiers versionnés
+  const home = await fetch(`${BASE}/`, { headers: { 'Accept-Encoding': 'gzip' } });
+  assert.equal(home.headers.get('content-encoding'), 'gzip');
+  const cssUrl = /\/css\/app\.css\?v=\w+/.exec(await home.text())[0];
+  const css = await fetch(BASE + cssUrl, { headers: { 'Accept-Encoding': 'gzip' } });
+  assert.equal(css.headers.get('content-encoding'), 'gzip'); assert.match(css.headers.get('cache-control'), /immutable/);
+  // un seul bouton principal en haut de l'accueil
+  const hero = /<div class="hero-cta">([\s\S]*?)<\/div>/.exec((await c.get('/')).text)[1];
+  assert.equal((hero.match(/class="btn /g) || []).length, 1);
+  // anti-spam : champ piège présent et bloquant
+  assert.match((await c.get('/commande')).text, /name="website"/);
+  const bot = await c.post('/api/orders', { json: checkout(await firstSlot(c), { website: 'http://spam.example' }) });
+  assert.equal(bot.status, 422);
+  assert.equal((await c.post('/inscription', { form: { first_name: 'Bot', last_name: 'Bot', email: 'bot@spam.example', password: 'motdepasse-123', accept: 'on', website: 'x' } })).status, 422);
+  // statistiques anonymes : visiteurs et pages vues comptés, robots et pages privées ignorés, aucune donnée personnelle
+  const browser = { Accept: 'text/html', 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148', Referer: 'https://www.instagram.com/' };
+  for (const u of ['/', '/boutique', `/produit/${slug}`]) await c.get(u, { headers: browser });
+  await c.get('/', { headers: { ...browser, 'User-Agent': 'Googlebot/2.1' } });
+  await c.get('/compte', { headers: browser });
+  const admin = client(); await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const stats = (await admin.get('/admin/statistiques?jours=7')).text;
+  assert.match(stats, /Visiteurs<\/span><span class="k-value">1</);
+  assert.match(stats, /Pages vues<\/span><span class="k-value">3</);
+  assert.match(stats, /Instagram/); assert.match(stats, /Mobile/); assert.match(stats, /Produit : /);
+  assert.equal((await client().get('/admin/statistiques')).status, 303, 'réservé à l’admin');
+});
+
 test('remise à zéro avant l’ouverture (dernier test : efface les commandes)', async () => {
   const admin = client();
   await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
