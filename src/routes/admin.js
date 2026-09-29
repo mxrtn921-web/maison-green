@@ -459,6 +459,23 @@ post('/admin/boutique', (ctx) => {
   setFlash(ctx.res, 'success', 'Coordonnées de la boutique enregistrées : elles apparaissent sur le site et dans les pages légales.');
   redirect(ctx.res, '/admin/horaires');
 });
+// Informations légales (mentions légales et CGV) et nom affiché de l'administrateur.
+post('/admin/boutique/legal', (ctx) => {
+  admin(ctx);
+  const t = (label, max, required = false) => v.text({ label, max, required });
+  const { data, errors, ok } = validate({
+    legal_name: t('La raison sociale', 120), legal_form: t('La forme juridique', 80), legal_capital: t('Le capital', 30),
+    legal_siren: t('Le SIREN / SIRET', 30), legal_rcs: t('La ville du RCS', 60), legal_tva: t('Le n° de TVA', 40),
+    legal_manager: t('Le directeur de la publication', 80), legal_mediator: t('Le médiateur', 200),
+    first_name: t('Votre prénom', 60, true), last_name: t('Votre nom', 60),
+  }, ctx.body);
+  if (!ok) return sendHtml(ctx.res, hoursData(ctx, { form: Object.values(errors)[0] }), 422);
+  const { first_name, last_name, ...legal } = data;
+  setSetting('shop', { ...getSetting('shop', {}), ...legal });
+  run('UPDATE users SET first_name = ?, last_name = ? WHERE id = ?', first_name, last_name || '', ctx.user.id);
+  setFlash(ctx.res, 'success', 'Informations légales enregistrées : les mentions légales et les CGV sont à jour.');
+  redirect(ctx.res, '/admin/horaires');
+});
 post('/admin/horaires/reglages', (ctx) => {
   admin(ctx);
   const [lead, err] = v.int({ label: 'Le délai', max: 1440 })(ctx.body.lead_time_minutes);

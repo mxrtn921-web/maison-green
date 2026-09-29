@@ -1,10 +1,11 @@
 // Contenus légaux — modèles à faire relire et compléter (les mentions entre crochets sont à renseigner).
-// {adresse}, {email} et {contact} sont remplacés par les coordonnées saisies dans l'admin (src/lib/shop.js).
+// {adresse}, {email}, {contact}, {editeur}, {tva}, {gerant} et {mediateur} sont remplacés par les informations
+// saisies dans Admin → Horaires (« Coordonnées » et « Informations légales »), voir src/routes/account.js.
 export const LEGAL = {
   '/mentions-legales': {
     title: 'Mentions légales',
     sections: [
-      ['Éditeur du site', ['Maison Green, [forme juridique] au capital de [montant] €, immatriculée au RCS de Rouen sous le numéro [SIREN], dont le siège est situé {adresse}.', 'Numéro de TVA intracommunautaire : [à compléter]. Directeur de la publication : [nom du gérant].', 'Contact : {contact}.']],
+      ['Éditeur du site', ['{editeur}', 'Numéro de TVA intracommunautaire : {tva}. Directeur de la publication : {gerant}.', 'Contact : {contact}.']],
       ['Hébergement', ['Le site est hébergé par Railway Corporation, San Francisco, Californie (États-Unis) — https://railway.com.']],
       ['Propriété intellectuelle', ['La marque Maison Green, son logo et les contenus du site sont la propriété de Maison Green. Toute reproduction sans autorisation est interdite.']],
     ],
@@ -17,7 +18,7 @@ export const LEGAL = {
       ['Prix et paiement', ['Les prix sont indiqués en euros TTC. Les frais de livraison dépendent de la zone et sont affichés avant la validation.', 'Le paiement s’effectue uniquement par carte bancaire via notre prestataire Stripe, au moment de la commande. Maison Green ne conserve aucune donnée bancaire.']],
       ['Livraison', ['La livraison a lieu dans le créneau choisi. En cas d’absence, le livreur tente de joindre le client par téléphone. Les produits frais ne peuvent pas être laissés sans instruction explicite du client.']],
       ['Droit de rétractation', ['Conformément à l’article L221-28 du Code de la consommation, le droit de rétractation ne s’applique pas aux denrées périssables. Pour les autres produits, contactez-nous sous 14 jours.']],
-      ['Réclamations', ['Tout produit manquant ou abîmé doit être signalé dans les 24 heures ({contact}). Il sera remboursé ou remplacé. Médiateur de la consommation : [à compléter].']],
+      ['Réclamations', ['Tout produit manquant ou abîmé doit être signalé dans les 24 heures ({contact}). Il sera remboursé ou remplacé. Médiateur de la consommation : {mediateur}.']],
     ],
   },
   '/confidentialite': {

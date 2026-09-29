@@ -428,9 +428,28 @@ export function hoursPage(ctx, { hours, slots, closures, settings, shop, lastBac
         <div class="field"><label for="sp">Code postal</label><input class="input" id="sp" name="postal" value="${shop.postal}" inputmode="numeric" required></div>
         <div class="field"><label for="sc">Ville</label><input class="input" id="sc" name="city" value="${shop.city}" required></div>
         <div class="field"><label for="st">Téléphone</label><input class="input" id="st" name="phone" type="tel" value="${shop.phone}" placeholder="Non affiché s'il est vide"></div>
-        <div class="field"><label for="se">E-mail (reçoit aussi les nouvelles commandes)</label><input class="input" id="se" name="email" type="email" value="${shop.email}" required></div>
+        <div class="field"><label for="se">E-mail de contact</label><input class="input" id="se" name="email" type="email" value="${shop.email}" required></div>
       </div>
       <div><button class="btn btn-dark btn-sm">Enregistrer</button> <span class="small muted">Affichées en bas du site, dans le suivi de commande, l'espace livreur et les pages légales.</span></div>
+    </form>
+  </section>
+
+  <section class="panel"><div class="panel-head"><h2>Informations légales</h2></div>
+    <form class="panel-body form-grid" method="post" action="/admin/boutique/legal">
+      <p class="small muted">Elles complètent automatiquement les <a class="link" href="/mentions-legales" target="_blank">mentions légales</a> et les <a class="link" href="/cgv" target="_blank">CGV</a>. Un champ vide apparaît comme « [à compléter] ».</p>
+      <div class="grid-2">
+        <div class="field"><label for="lg1">Raison sociale</label><input class="input" id="lg1" name="legal_name" value="${shop.legal_name || 'Maison Green'}"></div>
+        <div class="field"><label for="lg2">Forme juridique</label><input class="input" id="lg2" name="legal_form" value="${shop.legal_form || ''}" placeholder="SARL, SAS, EI, micro-entreprise…"></div>
+        <div class="field"><label for="lg3">Capital (€)</label><input class="input" id="lg3" name="legal_capital" value="${shop.legal_capital || ''}" inputmode="numeric" placeholder="Vide pour une entreprise individuelle"></div>
+        <div class="field"><label for="lg4">SIREN ou SIRET</label><input class="input" id="lg4" name="legal_siren" value="${shop.legal_siren || ''}" inputmode="numeric"></div>
+        <div class="field"><label for="lg5">Ville du RCS</label><input class="input" id="lg5" name="legal_rcs" value="${shop.legal_rcs || ''}" placeholder="Rouen (vide si non inscrit)"></div>
+        <div class="field"><label for="lg6">N° de TVA intracommunautaire</label><input class="input" id="lg6" name="legal_tva" value="${shop.legal_tva || ''}" placeholder="FR…"></div>
+        <div class="field"><label for="lg7">Directeur de la publication (gérant)</label><input class="input" id="lg7" name="legal_manager" value="${shop.legal_manager || ''}"></div>
+        <div class="field"><label for="lg8">Médiateur de la consommation</label><input class="input" id="lg8" name="legal_mediator" value="${shop.legal_mediator || ''}" placeholder="Nom et site web du médiateur"></div>
+        <div class="field"><label for="lg9">Votre prénom (affiché dans l'admin)</label><input class="input" id="lg9" name="first_name" value="${ctx.user.first_name}" required></div>
+        <div class="field"><label for="lg10">Votre nom</label><input class="input" id="lg10" name="last_name" value="${ctx.user.last_name || ''}"></div>
+      </div>
+      <div><button class="btn btn-dark btn-sm">Enregistrer</button></div>
     </form>
   </section>
 
@@ -510,17 +529,20 @@ export function revenuePage(ctx, { report: r, years }) {
 // ——— Livreurs ————————————————————————————————————————————————
 
 export function driversPage(ctx, { drivers, errors = {}, values = {}, created = null }) {
+  // Colonne espèces : seulement s'il reste de l'argent d'anciennes commandes en espèces chez un livreur.
+  const cashCol = drivers.some((d) => d.cash_held);
+  const cashCell = (d) => html`<td class="r">${d.cash_held ? html`<form method="post" action="/admin/livreurs/${d.id}/especes" class="inline-form" style="justify-content:flex-end;flex-wrap:nowrap" data-confirm="Confirmer la remise de ${money(d.cash_held)} en caisse par ${d.first_name} ?"><strong class="num">${money(d.cash_held)}</strong><button class="btn btn-ghost btn-sm">Remis en caisse</button></form>` : html`<span class="muted">—</span>`}</td>`;
   const body = html`
   <div class="pro-head"><div><h1 class="h1">Livreurs</h1><p>Chaque livreur se connecte sur <strong>/livreur</strong> depuis son téléphone.</p></div></div>
   ${created ? html`<div class="notice notice-success" style="margin-bottom:16px">${icon('check')}<span>${created.reset ? 'Nouveau mot de passe créé.' : 'Compte créé.'} Transmettez ces identifiants à ${created.first_name} : <strong>${created.email}</strong> / <strong>${created.password}</strong>. Notez-les maintenant : le mot de passe ne sera plus affiché (en cas d'oubli, cliquez sur « Nouveau mot de passe »).</span></div>` : ''}
   <section class="panel"><div class="table-wrap"><table class="table">
-    <thead><tr><th>Livreur</th><th>Véhicule</th><th class="r">En cours</th><th class="r">Livrées aujourd'hui</th><th class="r">Espèces détenues</th><th>Statut</th><th></th></tr></thead>
+    <thead><tr><th>Livreur</th><th>Véhicule</th><th class="r">En cours</th><th class="r">Livrées aujourd'hui</th>${cashCol ? html`<th class="r">Espèces détenues</th>` : ''}<th>Statut</th><th></th></tr></thead>
     <tbody>${drivers.map((d) => html`<tr>
       <td><span class="strong">${d.first_name} ${d.last_name}</span><div class="small muted">${d.phone} · ${d.email}</div></td>
       <td class="small">${d.vehicle}</td>
       <td class="r">${d.active_count}</td>
       <td class="r">${d.delivered_today}</td>
-      <td class="r">${d.cash_held ? html`<form method="post" action="/admin/livreurs/${d.id}/especes" class="inline-form" style="justify-content:flex-end;flex-wrap:nowrap" data-confirm="Confirmer la remise de ${money(d.cash_held)} en caisse par ${d.first_name} ?"><strong class="num">${money(d.cash_held)}</strong><button class="btn btn-ghost btn-sm">Remis en caisse</button></form>` : html`<span class="muted">—</span>`}</td>
+      ${cashCol ? cashCell(d) : ''}
       <td>${d.is_active ? (d.is_available ? html`<span class="badge b-paid">Disponible</span>` : html`<span class="badge">En pause</span>`) : html`<span class="badge b-cancelled">Désactivé</span>`}</td>
       <td class="r"><div class="row" style="justify-content:flex-end;gap:4px;flex-wrap:nowrap"><form method="post" action="/admin/livreurs/${d.id}/mot-de-passe"><button class="btn btn-quiet btn-sm">Nouveau mot de passe</button></form><form method="post" action="/admin/livreurs/${d.id}/activer"><button class="btn btn-quiet btn-sm">${d.is_active ? 'Désactiver' : 'Réactiver'}</button></form></div></td>
     </tr>`)}</tbody></table></div></section>

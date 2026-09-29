@@ -180,7 +180,11 @@ post('/compte/supprimer', (ctx) => {
 // ——— Pages légales ——————————————————————————————————————————
 const fillLegal = (text) => {
   const s = shopInfo();
-  return text.replaceAll('{adresse}', s.fullAddress).replaceAll('{email}', s.email).replaceAll('{contact}', [s.email, s.phone].filter(Boolean).join(' · '));
+  const todo = (v) => (v && String(v).trim()) || '[à compléter]';
+  const editeur = `${s.legal_name || 'Maison Green'}, ${todo(s.legal_form)}${s.legal_capital ? ` au capital de ${s.legal_capital} €` : ''}, immatriculée sous le numéro ${todo(s.legal_siren)}${s.legal_rcs ? ` (RCS ${s.legal_rcs})` : ''}, dont le siège est situé ${s.fullAddress}.`;
+  return text.replaceAll('{editeur}', editeur).replaceAll('{tva}', s.legal_tva || 'non applicable (article 293 B du CGI) ou à compléter')
+    .replaceAll('{gerant}', todo(s.legal_manager)).replaceAll('{mediateur}', todo(s.legal_mediator))
+    .replaceAll('{adresse}', s.fullAddress).replaceAll('{email}', s.email).replaceAll('{contact}', [s.email, s.phone].filter(Boolean).join(' · '));
 };
 for (const [path, page] of Object.entries(LEGAL)) {
   get(path, (ctx) => sendHtml(ctx.res, legalPage(ctx, { ...page, sections: page.sections.map(([h, ps]) => [h, ps.map(fillLegal)]) })));
