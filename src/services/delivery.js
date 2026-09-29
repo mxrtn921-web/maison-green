@@ -59,17 +59,24 @@ export function findSlot(date, start) {
 }
 
 /** État global de la prise de commande, pour afficher un message clair au client. */
+/** Livreurs actifs et en mode « Disponible » : sans eux, aucune commande n'est possible. */
+export const availableDrivers = () => one(`SELECT COUNT(*) AS n FROM users u JOIN drivers d ON d.user_id = u.id
+                                          WHERE u.role = 'driver' AND u.is_active = 1 AND d.is_available = 1`).n;
+export const NO_DRIVER_MESSAGE = "Aucun livreur n'est disponible pour le moment : les commandes reprendront dès qu'un livreur sera en service.";
+
 export function orderingState() {
   const paused = getSetting('orders_paused', false);
   const days = availableSlots();
   const first = days.flatMap((d) => d.slots.filter((s) => s.remaining > 0).map((s) => ({ ...s, dayLabel: d.label })))[0] || null;
   const now = parisNow();
   const open = shopOpenNow(now);
+  const drivers = availableDrivers();
   let message = null;
   if (paused) message = getSetting('pause_message', 'Les commandes sont momentanément suspendues. Revenez très vite.');
+  else if (!drivers) message = NO_DRIVER_MESSAGE;
   else if (!first) message = "Aucun créneau de livraison n'est disponible pour le moment.";
   else if (first.date !== now.date) message = `Livraisons terminées pour aujourd'hui. Prochain créneau : ${first.dayLabel.toLowerCase()}, ${first.label}.`;
-  return { accepting: !paused && Boolean(first), open, nextSlot: first, message, isToday: first?.date === now.date };
+  return { accepting: !paused && drivers > 0 && Boolean(first), open, nextSlot: first, message, isToday: first?.date === now.date };
 }
 
 export function hoursSummary() {

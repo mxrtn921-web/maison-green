@@ -134,6 +134,31 @@ test('parcours complet carte : client → livreur → livrée, sans espèces', a
   for (const a of ['pickup', 'start', 'deliver']) assert.equal((await driver.post(`/livreur/courses/${id}/${a}`)).status, 303);
   const done = (await c.get(`/suivi/${token}`)).text;
   assert.match(done, /Livrée/);
+
+  // aucun livreur disponible : commande impossible, et une vente payée entre-temps est annulée + remboursée
+  const pending = await c.post('/api/orders', { json: checkout(await firstSlot(c)) });
+  assert.equal(pending.status, 201, JSON.stringify(pending.data));
+  const pendingToken = pending.data.redirect.split('/').pop();
+  const ines = (await admin.get('/admin/livreurs')).text.split('<tr').find((row) => row.includes('Inès'));
+  const inesId = /\/admin\/livreurs\/(\d+)\/activer/.exec(ines)[1];
+  const setLucas = (on) => driver.post('/livreur/disponibilite', { form: on ? { available: '1' } : {} });
+  await admin.post(`/admin/livreurs/${inesId}/activer`); // Inès désactivée
+  await setLucas(false);                                   // Lucas en pause
+  try {
+    assert.match((await c.get('/commande')).text, /Aucun livreur n(&#39;|&#x27;|')est disponible/);
+    const refused = await c.post('/api/orders', { json: checkout(await firstSlot(c)) });
+    assert.equal(refused.status, 422);
+    assert.match(refused.data.message, /Aucun livreur/);
+    await c.post(`/paiement-demo/${pendingToken}`, { form: { result: 'success' } });
+    let page = '';
+    for (let i = 0; i < 40; i++) { page = (await c.get(`/suivi/${pendingToken}`)).text; if (/rembours/i.test(page)) break; await new Promise((w) => setTimeout(w, 50)); }
+    assert.match(page, /Aucun livreur disponible/);
+    assert.match(page, /rembours/i);
+  } finally {
+    await setLucas(true);
+    await admin.post(`/admin/livreurs/${inesId}/activer`); // Inès réactivée
+  }
+  assert.equal((await c.post('/api/orders', { json: checkout(await firstSlot(c)) })).status, 201, 'les commandes reprennent');
 });
 
 test('paiement carte (démo) : échec, nouvel essai, succès, remboursement', async () => {

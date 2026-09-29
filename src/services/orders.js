@@ -7,7 +7,7 @@ import { publish } from '../lib/events.js';
 import { money } from '../lib/html.js';
 import { dayLabel, hLabel } from '../lib/time.js';
 import { quoteCart } from './catalog.js';
-import { zoneForPostal, deliveryFee, findSlot, orderingState } from './delivery.js';
+import { zoneForPostal, deliveryFee, findSlot, orderingState, availableDrivers } from './delivery.js';
 import { notify, sendEmail, orderEmail } from './notify.js';
 import { refundPayment } from './payments.js';
 
@@ -142,6 +142,13 @@ export function createOrder(input, user) {
  *  tout de suite (ils acceptent ou refusent), et on prévient la boutique et le client. */
 function onOrderPlaced(order) {
   const items = orderItems(order.id);
+  // Plus aucun livreur disponible au moment du paiement : la vente est annulée tout de suite et le client remboursé.
+  if (!availableDrivers()) {
+    cancelOrder(order.id, null, 'Aucun livreur disponible — client remboursé automatiquement')
+      .catch((e) => notify({ audience: 'admin', kind: 'refund_failed', title: `${order.number} : remboursement à vérifier`, body: e.message, orderId: order.id, link: `/admin/commandes/${order.id}` }))
+      .finally(() => notify({ audience: 'admin', kind: 'order_cancelled', title: `${order.number} annulée`, body: 'Aucun livreur disponible : vente annulée et client remboursé.', orderId: order.id, link: `/admin/commandes/${order.id}` }));
+    return;
+  }
   const confirmed = tx(() => {
     const r = run("UPDATE orders SET status = 'confirmed', updated_at = ? WHERE id = ? AND status = 'received'", nowIso(), order.id);
     if (r.changes === 1) addEvent(order.id, 'confirmed', 'Commande confirmée automatiquement — en attente d’un livreur');
