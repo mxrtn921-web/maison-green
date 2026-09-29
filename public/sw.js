@@ -10,11 +10,18 @@ const show = (title, opts) => self.registration.showNotification(title, {
 
 self.addEventListener('push', (event) => {
   event.waitUntil((async () => {
-    let n = { title: 'Maison Green', body: 'Nouvelle notification', link: '/' };
-    try {
-      const r = await fetch('/api/notifications', { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
-      if (r.ok) { const list = await r.json(); if (list.length) n = list[0]; }
-    } catch { /* hors ligne : message générique */ }
+    let n = null;
+    // 1) Contenu envoyé dans l'alerte elle-même (ne dépend pas de la connexion au site : fiable sur iPhone).
+    try { if (event.data) n = event.data.json(); } catch { n = null; }
+    // 2) Ancien abonnement : on demande la dernière notification au site.
+    if (!n || !n.title) {
+      try {
+        const r = await fetch('/api/notifications', { credentials: 'include', headers: { Accept: 'application/json' }, cache: 'no-store' });
+        if (r.ok) { const list = await r.json(); if (list.length) n = list[0]; }
+      } catch { /* hors ligne */ }
+    }
+    // 3) Dernier recours : message générique qui ouvre l'espace de l'équipe (pas la boutique).
+    if (!n || !n.title) n = { title: 'Maison Green', body: 'Nouvelle alerte : touchez pour ouvrir.', link: '/livreur' };
     const isRun = n.kind === 'delivery_available' && n.order_id;
     await show(n.title, {
       body: n.body || '', tag: `mg-${n.id || Date.now()}`, renotify: true, requireInteraction: true,

@@ -164,7 +164,7 @@ get('/api/notifications', (ctx) => {
 get('/api/push/key', (ctx) => { requireRole(ctx, 'admin', 'driver'); sendJson(ctx.res, { key: Push.publicKey() }); });
 post('/api/push/subscribe', (ctx) => {
   requireRole(ctx, 'admin', 'driver');
-  const ok = Push.subscribe(ctx.user.id, ctx.body.endpoint, ctx.req.headers['user-agent'] || '');
+  const ok = Push.subscribe(ctx.user.id, ctx.body.endpoint, ctx.req.headers['user-agent'] || '', ctx.body.keys);
   sendJson(ctx.res, { ok }, ok ? 200 : 422);
 });
 post('/api/push/unsubscribe', (ctx) => { requireRole(ctx, 'admin', 'driver'); Push.unsubscribe(ctx.user.id, ctx.body.endpoint); sendJson(ctx.res, { ok: true }); });

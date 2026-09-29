@@ -230,6 +230,8 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint    TEXT NOT NULL UNIQUE,
   user_agent  TEXT NOT NULL DEFAULT '',
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  last_ok_at  TEXT
+  last_ok_at  TEXT,
+  p256dh      TEXT NOT NULL DEFAULT '',
+  auth        TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);

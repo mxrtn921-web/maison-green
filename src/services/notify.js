@@ -12,7 +12,7 @@ export function notify({ userId = null, audience = null, kind, title, body = '',
   if (audience) publish(audience, 'notification', payload);
   if (userId) publish(`user:${userId}`, 'notification', payload);
   // Alerte push (téléphone verrouillé) pour l'équipe : boutique et livreurs.
-  if (audience === 'admin' || audience === 'driver' || userId) pushTo({ userId, audience }).catch((e) => console.error(e));
+  if (audience === 'admin' || audience === 'driver' || userId) pushTo({ userId, audience, message: { ...payload, order_id: orderId } }).catch((e) => console.error(e));
 }
 
 export function notificationsFor(user, limit = 20) {

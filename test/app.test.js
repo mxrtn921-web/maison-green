@@ -354,7 +354,7 @@ test('rayons de l’épicerie et chiffre d’affaires annuel', async () => {
 test('alertes push livreur (VAPID signé) et sauvegarde de la base', async () => {
   const http = await import('node:http');
   const hits = [];
-  const fake = http.createServer((req, res) => { hits.push({ url: req.url, headers: req.headers }); res.writeHead(201); res.end(); });
+  const fake = http.createServer((req, res) => { const chunks = []; req.on('data', (d) => chunks.push(d)); req.on('end', () => { hits.push({ url: req.url, headers: req.headers, body: Buffer.concat(chunks) }); res.writeHead(201); res.end(); }); });
   await new Promise((r) => fake.listen(0, r));
   const pushUrl = `http://localhost:${fake.address().port}`;
   const admin = client();
@@ -366,7 +366,9 @@ test('alertes push livreur (VAPID signé) et sauvegarde de la base', async () =>
     const { data } = await driver.get('/api/push/key');
     assert.equal(Buffer.from(data.key, 'base64url').length, 65);
     assert.equal((await driver.post('/api/push/subscribe', { json: { endpoint: 'ftp://pirate' } })).status, 422);
-    assert.equal((await driver.post('/api/push/subscribe', { json: { endpoint: `${pushUrl}/push/lucas`, keys: { p256dh: 'x', auth: 'y' } } })).status, 200);
+    // clés du « téléphone » (comme un vrai navigateur) pour pouvoir déchiffrer l'alerte
+    const phone = crypto.createECDH('prime256v1'); const phonePub = phone.generateKeys(); const phoneAuth = crypto.randomBytes(16);
+    assert.equal((await driver.post('/api/push/subscribe', { json: { endpoint: `${pushUrl}/push/lucas`, keys: { p256dh: phonePub.toString('base64url'), auth: phoneAuth.toString('base64url') } } })).status, 200);
 
     // nouvelle commande, confirmée par la boutique → les livreurs sont alertés
     const id = Number(/href="\/admin\/produits\/(\d+)"[^>]*>Baguette tradition/.exec((await admin.get('/admin/produits')).text)[1]);
@@ -385,6 +387,22 @@ test('alertes push livreur (VAPID signé) et sauvegarde de la base', async () =>
     const key = crypto.createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: pub.subarray(1, 33).toString('base64url'), y: pub.subarray(33).toString('base64url') }, format: 'jwk' });
     assert.ok(crypto.verify('sha256', Buffer.from(`${h}.${claims}`), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig, 'base64url')), 'signature VAPID valide');
     assert.equal(JSON.parse(Buffer.from(claims, 'base64url')).aud, pushUrl);
+    // contenu chiffré dans l'alerte (RFC 8291) : le téléphone l'affiche sans appeler le site
+    assert.equal(hits[0].headers['content-encoding'], 'aes128gcm');
+    const b = hits[0].body;
+    const salt = b.subarray(0, 16); const idlen = b[20]; const asPub = b.subarray(21, 21 + idlen); const ct = b.subarray(21 + idlen);
+    const hk = (ikm, sl, info, len) => Buffer.from(crypto.hkdfSync('sha256', ikm, sl, info, len));
+    const ikm = hk(phone.computeSecret(asPub), phoneAuth, Buffer.concat([Buffer.from('WebPush: info\0'), phonePub, asPub]), 32);
+    const dec = crypto.createDecipheriv('aes-128-gcm', hk(ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16), hk(ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12));
+    dec.setAuthTag(ct.subarray(ct.length - 16));
+    const plain = Buffer.concat([dec.update(ct.subarray(0, ct.length - 16)), dec.final()]);
+    assert.equal(plain[plain.length - 1], 2);
+    const msg = JSON.parse(plain.subarray(0, -1).toString());
+    assert.equal(msg.kind, 'delivery_available');
+    assert.equal(msg.order_id, orderId);
+    assert.equal(msg.link, `/livreur/courses/${orderId}`);
+    assert.match(msg.title, /Nouvelle course MG-/);
+    assert.match(msg.body, /Accepter ou refuser/);
     const notes = (await driver.get('/api/notifications')).data;
     assert.match(notes[0].title, /Nouvelle course MG-/);
   } finally { fake.close(); }

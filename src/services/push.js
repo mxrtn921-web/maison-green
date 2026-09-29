@@ -1,6 +1,7 @@
 // Notifications push Web Push (VAPID), sans dépendance : alertes même téléphone verrouillé.
-// Le message envoyé est vide (pas de chiffrement nécessaire) : le service worker (public/sw.js)
-// récupère la dernière notification via /api/notifications et l'affiche.
+// Le contenu de l'alerte (titre, texte, lien, course) est chiffré dans le message (RFC 8291, aes128gcm) :
+// le téléphone l'affiche sans avoir besoin d'appeler le site (indispensable sur iPhone, app fermée).
+// Ancien abonnement sans clés : message vide, le service worker récupère alors /api/notifications.
 import crypto from 'node:crypto';
 import { one, all, run, getSetting, setSetting, nowIso } from '../db.js';
 import { config } from '../config.js';
@@ -37,22 +38,56 @@ export function validEndpoint(endpoint) {
   } catch { return false; }
 }
 
-export function subscribe(userId, endpoint, userAgent = '') {
+const validKeys = (keys) => {
+  try {
+    const p = Buffer.from(String(keys?.p256dh || ''), 'base64url'); const a = Buffer.from(String(keys?.auth || ''), 'base64url');
+    return p.length === 65 && p[0] === 4 && a.length === 16;
+  } catch { return false; }
+};
+
+export function subscribe(userId, endpoint, userAgent = '', keys = null) {
   if (!validEndpoint(endpoint)) return false;
-  run(`INSERT INTO push_subscriptions (user_id, endpoint, user_agent) VALUES (?, ?, ?)
-       ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, user_agent = excluded.user_agent`, userId, String(endpoint), String(userAgent).slice(0, 200));
+  const k = validKeys(keys) ? { p256dh: String(keys.p256dh), auth: String(keys.auth) } : { p256dh: '', auth: '' };
+  run(`INSERT INTO push_subscriptions (user_id, endpoint, user_agent, p256dh, auth) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, user_agent = excluded.user_agent,
+         p256dh = CASE WHEN excluded.p256dh <> '' THEN excluded.p256dh ELSE push_subscriptions.p256dh END,
+         auth = CASE WHEN excluded.auth <> '' THEN excluded.auth ELSE push_subscriptions.auth END`,
+    userId, String(endpoint), String(userAgent).slice(0, 200), k.p256dh, k.auth);
   return true;
+}
+
+/** Chiffre le message pour un abonnement (RFC 8291 + RFC 8188, un seul bloc aes128gcm). */
+export function encryptPayload(payload, p256dh, auth) {
+  const uaPublic = Buffer.from(p256dh, 'base64url');
+  const authSecret = Buffer.from(auth, 'base64url');
+  const ecdh = crypto.createECDH('prime256v1');
+  const asPublic = ecdh.generateKeys();
+  const shared = ecdh.computeSecret(uaPublic);
+  const hkdf = (ikm, salt, info, len) => Buffer.from(crypto.hkdfSync('sha256', ikm, salt, info, len));
+  const ikm = hkdf(shared, authSecret, Buffer.concat([Buffer.from('WebPush: info\0'), uaPublic, asPublic]), 32);
+  const salt = crypto.randomBytes(16);
+  const cek = hkdf(ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = hkdf(ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12);
+  const cipher = crypto.createCipheriv('aes-128-gcm', cek, nonce);
+  const body = Buffer.concat([cipher.update(Buffer.concat([Buffer.from(payload), Buffer.from([2])])), cipher.final(), cipher.getAuthTag()]);
+  const rs = Buffer.alloc(4); rs.writeUInt32BE(4096);
+  return Buffer.concat([salt, rs, Buffer.from([asPublic.length]), asPublic, body]);
 }
 export const unsubscribe = (userId, endpoint) => run('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?', userId, String(endpoint));
 export const subscriptionCount = (userId) => one('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?', userId).n;
 
-async function send(sub) {
+async function send(sub, message = null) {
   try {
-    const r = await fetch(sub.endpoint, {
-      method: 'POST', body: '',
-      headers: { TTL: '3600', Urgency: 'high', Authorization: vapidHeader(sub.endpoint) },
-      signal: AbortSignal.timeout(10000),
-    });
+    const headers = { TTL: '3600', Urgency: 'high', Authorization: vapidHeader(sub.endpoint) };
+    let body = '';
+    if (message && sub.p256dh && sub.auth) {
+      try {
+        body = encryptPayload(JSON.stringify(message), sub.p256dh, sub.auth);
+        headers['Content-Encoding'] = 'aes128gcm';
+        headers['Content-Type'] = 'application/octet-stream';
+      } catch (e) { body = ''; console.error('Chiffrement push impossible :', e.message); }
+    }
+    const r = await fetch(sub.endpoint, { method: 'POST', body, headers, signal: AbortSignal.timeout(10000) });
     if (r.status === 404 || r.status === 410) run('DELETE FROM push_subscriptions WHERE id = ?', sub.id); // abonnement expiré
     else if (r.ok) run('UPDATE push_subscriptions SET last_ok_at = ? WHERE id = ?', nowIso(), sub.id);
     else console.error(`Push refusé (${r.status}) pour l'abonnement ${sub.id}`);
@@ -60,7 +95,7 @@ async function send(sub) {
 }
 
 /** Envoie une alerte à un utilisateur, ou à un public : 'admin' ou 'driver' (livreurs disponibles uniquement). */
-export function pushTo({ userId = null, audience = null }) {
+export function pushTo({ userId = null, audience = null, message = null }) {
   let subs = [];
   if (userId) subs = all('SELECT s.* FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE s.user_id = ? AND u.is_active = 1', userId);
   else if (audience === 'admin') subs = all("SELECT s.* FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE u.role = 'admin' AND u.is_active = 1");
@@ -68,5 +103,5 @@ export function pushTo({ userId = null, audience = null }) {
     subs = all(`SELECT s.* FROM push_subscriptions s JOIN users u ON u.id = s.user_id JOIN drivers d ON d.user_id = u.id
                 WHERE u.role = 'driver' AND u.is_active = 1 AND d.is_available = 1`);
   }
-  return Promise.all(subs.map(send));
+  return Promise.all(subs.map((s) => send(s, message)));
 }

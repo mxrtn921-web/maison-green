@@ -11,6 +11,12 @@ export const db = new DatabaseSync(config.dbFile);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 db.exec(fs.readFileSync(path.join(ROOT, 'src', 'schema.sql'), 'utf8'));
 
+// Migrations légères : colonnes ajoutées après la mise en ligne.
+const hasColumn = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+for (const [table, col, def] of [['push_subscriptions', 'p256dh', "TEXT NOT NULL DEFAULT ''"], ['push_subscriptions', 'auth', "TEXT NOT NULL DEFAULT ''"]]) {
+  if (!hasColumn(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+}
+
 const cache = new Map();
 function stmt(sql) {
   let s = cache.get(sql);
