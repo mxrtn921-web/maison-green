@@ -13,7 +13,7 @@ export const LEGAL = {
     title: 'Conditions générales de vente',
     sections: [
       ['Objet', ['Les présentes conditions régissent les ventes de produits d’épicerie effectuées sur le site Maison Green, avec livraison à domicile dans les zones desservies.']],
-      ['Commande', ['La commande est ferme après validation et, pour le paiement par carte, après confirmation du paiement. Un e-mail de confirmation contenant un lien de suivi est adressé au client.', 'Maison Green se réserve le droit d’annuler une commande en cas de rupture de stock ; le client est alors remboursé intégralement.']],
+      ['Commande', ['La commande est ferme après validation et, pour le paiement par carte, après confirmation du paiement. Le client suit ensuite sa commande en direct sur la page de suivi du site (ou depuis son compte).', 'Maison Green se réserve le droit d’annuler une commande en cas de rupture de stock ; le client est alors remboursé intégralement.']],
       ['Prix et paiement', ['Les prix sont indiqués en euros TTC. Les frais de livraison dépendent de la zone et sont affichés avant la validation.', 'Le paiement s’effectue uniquement par carte bancaire via notre prestataire Stripe, au moment de la commande. Maison Green ne conserve aucune donnée bancaire.']],
       ['Livraison', ['La livraison a lieu dans le créneau choisi. En cas d’absence, le livreur tente de joindre le client par téléphone. Les produits frais ne peuvent pas être laissés sans instruction explicite du client.']],
       ['Droit de rétractation', ['Conformément à l’article L221-28 du Code de la consommation, le droit de rétractation ne s’applique pas aux denrées périssables. Pour les autres produits, contactez-nous sous 14 jours.']],
@@ -25,7 +25,7 @@ export const LEGAL = {
     sections: [
       ['Responsable du traitement', ['Maison Green, {adresse} — {email}.']],
       ['Données collectées et finalités', ['Identité, coordonnées, adresse de livraison et instructions : nécessaires à l’exécution de votre commande (base légale : contrat).', 'Historique de commandes : gestion du service client et obligations comptables (base légale : obligation légale).', 'Adresse e-mail pour les actualités : uniquement si vous l’avez accepté (base légale : consentement, retirable à tout moment).']],
-      ['Destinataires', ['Nos équipes (préparation et livraison), notre prestataire de paiement Stripe (qui traite seul vos données bancaires), notre prestataire d’envoi d’e-mails et notre hébergeur. Aucune donnée n’est vendue.']],
+      ['Destinataires', ['Nos équipes (préparation et livraison), notre prestataire de paiement Stripe (qui traite seul vos données bancaires) et notre hébergeur. Aucune donnée n’est vendue.']],
       ['Durées de conservation', ['Compte client : jusqu’à sa suppression, ou 3 ans après la dernière commande. Commandes : 10 ans (obligation comptable), anonymisées si vous supprimez votre compte. Commandes sans compte : 3 ans.']],
       ['Cookies', ['Nous n’utilisons qu’un cookie de session strictement nécessaire (connexion) et le stockage local de votre navigateur pour mémoriser votre panier. Aucun cookie publicitaire ni de mesure d’audience : aucun bandeau de consentement n’est donc nécessaire.']],
       ['Vos droits', ['Vous disposez des droits d’accès, de rectification, d’effacement, de portabilité, de limitation et d’opposition. Depuis votre compte, vous pouvez exporter vos données et supprimer votre compte en un clic. Vous pouvez aussi nous écrire, ou saisir la CNIL (cnil.fr).']],
