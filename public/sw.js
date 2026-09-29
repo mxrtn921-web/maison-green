@@ -47,19 +47,29 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(takeNav().then((url) => new Response(JSON.stringify({ url }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })));
 });
 
-async function openUrl(link) {
-  const url = new URL(link || '/livreur', self.location.origin).href;
-  await rememberNav(url);
+const IOS = /iPhone|iPad|iPod/.test(self.navigator.userAgent) || (/Macintosh/.test(self.navigator.userAgent) && self.navigator.maxTouchPoints > 1);
+const absUrl = (link) => new URL(link || '/livreur', self.location.origin).href;
+
+async function tellOpenPage(url) {
   const wins = (await self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
     .filter((w) => new URL(w.url).origin === self.location.origin);
   const w = wins.find((c) => c.focused) || wins.find((c) => c.visibilityState === 'visible') || wins[0];
-  if (!w) {
-    try { const opened = await self.clients.openWindow(url); if (opened) return opened; } catch { /* la page réclamera la course au démarrage */ }
-    return null;
-  }
+  if (!w) return false;
   try { await w.focus(); } catch { /* déjà au premier plan */ }
   w.postMessage({ type: 'navigate', url });
-  return w;
+  return true;
+}
+
+// À appeler SANS attente préalable : l'iPhone n'autorise l'ouverture que tout de suite après le toucher.
+function openUrl(link) {
+  const url = absUrl(link);
+  if (IOS) {
+    // iPhone : openWindow ouvre l'app sur la course (qu'elle soit fermée, en veille ou ouverte).
+    const opening = self.clients.openWindow(url).catch(() => null);
+    return Promise.all([rememberNav(url), opening.then((w) => (w ? w : tellOpenPage(url)))]);
+  }
+  // Android / ordinateur : on réutilise la fenêtre ouverte, sinon on en ouvre une.
+  return rememberNav(url).then(() => tellOpenPage(url)).then((ok) => (ok ? null : self.clients.openWindow(url).catch(() => null)));
 }
 
 self.addEventListener('notificationclick', (event) => {
