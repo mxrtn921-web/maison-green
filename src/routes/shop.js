@@ -43,7 +43,14 @@ get('/', (ctx) => {
   const cats = categories({ withCounts: true }).filter((c) => c.product_count > 0);
   const featured = groupVariants(featuredProducts(24)).slice(0, 8);
   // Étagère de l'accueil : un produit par rayon, pour montrer la palette d'étiquettes.
-  const shelf = cats.slice(0, 6).map((c) => shopProducts({ category: c.slug }).find((p) => p.is_featured) || shopProducts({ category: c.slug })[0]).filter(Boolean).map((p) => (p.group_name ? { ...p, name: p.group_name, unit: `${p.variant_count} formats` } : p));
+  // Vitrine de l'accueil : un produit par rayon (de préférence avec photo), complétée jusqu'à 6 cases pour garder une grille pleine.
+  const pick = (list) => list.find((p) => p.is_featured && p.image_url) || list.find((p) => p.image_url) || list[0];
+  const shelfRaw = cats.slice(0, 6).map((c) => pick(shopProducts({ category: c.slug }))).filter(Boolean);
+  if (shelfRaw.length < 6) {
+    const taken = new Set(shelfRaw.map((p) => p.id));
+    for (const p of shopProducts({}).filter((x) => x.image_url && !taken.has(x.id))) { if (shelfRaw.length >= 6) break; shelfRaw.push(p); }
+  }
+  const shelf = shelfRaw.slice(0, 6).map((p) => (p.group_name ? { ...p, name: p.group_name, unit: `${p.variant_count} formats` } : p));
   sendHtml(ctx.res, homePage(ctx, { categories: cats, featured, zones: zones(), hours: hoursSummary(), state: orderingState(), shelf }));
 });
 

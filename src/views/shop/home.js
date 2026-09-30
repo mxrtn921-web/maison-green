@@ -13,7 +13,7 @@ export function homePage(ctx, { categories, featured, zones, hours, state, shelf
   <div class="wrap hero-grid">
     <div class="hero-copy">
       <h1 class="display">Votre épicerie de quartier, <em>livrée</em> à votre porte.</h1>
-      <p class="lede">Fruits et légumes, produits frais, épicerie fine et essentiels du quotidien. Choisis au comptoir de la rue de la République, livrés dans tout Rouen par notre équipe.</p>
+      <p class="lede">Épicerie, cafés, douceurs, vins et CBD : tout ce qu'il faut pour le quotidien et l'apéro, livré dans tout Rouen par notre équipe.</p>
       <div class="hero-cta">
         <a class="btn btn-primary btn-lg" href="/boutique">Commander maintenant <span class="arrow">${icon('arrow')}</span></a>
         <a class="hero-link" href="#livraison">Voir les zones de livraison</a>

@@ -28,7 +28,7 @@ export function catalogPage(ctx, { categories, products, q, category, state }) {
     <form class="search" role="search" action="/boutique" method="get" data-search-form>
       ${icon('search')}
       <label class="sr-only" for="recherche">Rechercher un produit</label>
-      <input class="input" id="recherche" type="search" name="q" value="${q}" placeholder="Rechercher : pommes, cidre, lessive…" autocomplete="off" enterkeyhint="search" data-live-search>
+      <input class="input" id="recherche" type="search" name="q" value="${q}" placeholder="Rechercher : Buldak, café, rosé…" autocomplete="off" enterkeyhint="search" data-live-search>
       ${category ? html`<input type="hidden" name="categorie" value="${category}">` : ''}
     </form>
     <nav class="chips" aria-label="Rayons">

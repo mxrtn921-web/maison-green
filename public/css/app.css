@@ -794,3 +794,41 @@ body:has(.cart-bar:not([hidden])) .cookie-note { bottom: calc(80px + env(safe-ar
 .variant .v-out { font-size: 12px; color: var(--danger); }
 .product-price .from { font-size: 12px; font-weight: 500; color: var(--ink-3); margin-right: 2px; }
 a.add-btn { text-decoration: none; }
+
+/* ==========================================================================
+   Refonte visuelle v2 : photos alignées, cartes produit, accueil
+   ========================================================================== */
+/* Photos produit : le produit est toujours centré, entier (jamais rogné) et à la même échelle,
+   quel que soit le cadrage de la photo d'origine. Le fond blanc des photos se fond dans la vignette. */
+.tag { min-height: 0; }
+.tag.photo { padding: 0; background: var(--stone); isolation: isolate; }
+.tag.photo img { position: absolute; inset: 9%; width: 82%; height: 82%; object-fit: contain; object-position: center; mix-blend-mode: multiply; }
+.line .tag.photo img, .table .thumb .tag.photo img { inset: 6%; width: 88%; height: 88%; }
+.pdp .tag.photo img { inset: 8%; width: 84%; height: 84%; }
+
+/* Cartes produit : même hauteur de titre et de sous-titre, prix et bouton toujours sur la même ligne */
+.product { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 8px 8px 12px; transition: box-shadow .25s var(--ease), transform .25s var(--ease), border-color .25s; }
+.product .tag { border-radius: 14px; }
+.product-body { padding: 12px 4px 0; }
+.product-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: calc(2 * 1.3em); }
+.product-unit { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.product-foot { padding-top: 12px; }
+.product-media:hover .tag { transform: none; }
+.product-media .tag.photo img { transition: transform .4s var(--ease); }
+@media (hover: hover) {
+  .product:hover { border-color: var(--line-strong); box-shadow: 0 10px 30px -14px rgba(23, 24, 26, .22); transform: translateY(-2px); }
+  .product:hover .tag.photo img { transform: scale(1.04); }
+}
+@media (min-width: 700px) { .product { padding: 10px 10px 14px; } .product-body { padding: 14px 6px 0; } }
+@media (prefers-reduced-motion: reduce) { .product, .product .tag.photo img { transition: none; } .product:hover { transform: none; } }
+
+/* Accueil : fond doux, vitrine de produits alignée (plus de décalage d'une case sur deux) */
+.hero { background: radial-gradient(120% 90% at 100% 0%, var(--green-tint) 0%, rgba(238, 243, 239, 0) 60%), var(--paper); }
+.shelf .tag:nth-child(n) { transform: none; }
+.shelf .tag { border-radius: 18px; box-shadow: 0 1px 0 var(--line), 0 12px 28px -18px rgba(23, 24, 26, .25); }
+.shelf .tag.photo { background: #fff; }
+@media (min-width: 900px) { .shelf .tag:nth-child(2), .shelf .tag:nth-child(5) { transform: none; } }
+
+/* Rayons : léger relief au survol */
+.cat-tile { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 8%, transparent); }
+@media (hover: hover) { .cat-tile:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 16%, transparent), 0 10px 24px -16px rgba(23, 24, 26, .3); } }
