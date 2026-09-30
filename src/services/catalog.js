@@ -3,6 +3,25 @@ import { all, one } from '../db.js';
 
 export const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+// ——— Variantes : les produits nommés « Nom — variante » (ex. « Amnesia — 5 g ») forment une seule fiche.
+// Chaque variante reste un produit à part entière (prix, stock, panier, commandes inchangés).
+const SEP = /\s+[—–-]\s+/;
+export const baseName = (name) => { const parts = String(name || '').split(SEP); return parts.length > 1 ? parts.slice(0, -1).join(' — ').trim() : String(name || ''); };
+export const variantLabel = (p) => { const parts = String(p.name || '').split(SEP); return parts.length > 1 ? parts[parts.length - 1].trim() : p.unit; };
+const groupKey = (p) => `${p.category_id}|${norm(baseName(p.name))}`;
+/** Regroupe les variantes : une carte par produit, avec la liste de ses formats (du moins cher au plus cher). */
+export function groupVariants(rows) {
+  const groups = new Map();
+  for (const p of rows) { const k = groupKey(p); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+  return [...groups.values()].map((list) => {
+    if (list.length === 1) return list[0];
+    const variants = [...list].sort((a, b) => a.price_cents - b.price_cents);
+    const lead = variants.find((v) => v.stock > 0) || variants[0];
+    return { ...lead, group_name: baseName(lead.name), variants, variant_count: variants.length, min_price_cents: variants[0].price_cents,
+      stock: variants.reduce((s, v) => s + Math.max(0, v.stock), 0) };
+  });
+}
+
 export const categories = ({ withCounts = false, includeInactive = false } = {}) =>
   all(`SELECT c.*${withCounts ? `, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.is_active = 1 AND p.deleted_at IS NULL) AS product_count` : ''}
        FROM categories c ${includeInactive ? '' : 'WHERE c.is_active = 1'} ORDER BY c.position, c.name`);
@@ -28,6 +47,9 @@ export const featuredProducts = (limit = 8) =>
 
 export const productBySlug = (slug) => one(`${BASE} WHERE p.slug = ? AND p.deleted_at IS NULL AND p.is_active = 1`, slug);
 export const productById = (id) => one(`${BASE} WHERE p.id = ? AND p.deleted_at IS NULL`, id);
+/** Autres formats du même produit (même rayon, même nom de base), du moins cher au plus cher. */
+export const siblingsOf = (p) => all(`${BASE} WHERE p.deleted_at IS NULL AND p.is_active = 1 AND p.category_id IS ?`, p.category_id)
+  .filter((x) => norm(baseName(x.name)) === norm(baseName(p.name))).sort((a, b) => a.price_cents - b.price_cents);
 
 export const adminProducts = ({ q = '', category = '' } = {}) => {
   let rows = all(`${BASE} WHERE p.deleted_at IS NULL ORDER BY c.position, p.name`);

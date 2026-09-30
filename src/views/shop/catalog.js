@@ -1,6 +1,7 @@
 import { html, raw, money } from '../../lib/html.js';
 import { icon, productCard, productTag, addControl } from '../ui.js';
 import { shopLayout } from './layout.js';
+import { baseName, variantLabel } from '../../services/catalog.js';
 
 export function catalogPage(ctx, { categories, products, q, category, state }) {
   const current = categories.find((c) => c.slug === category);
@@ -40,19 +41,26 @@ export function catalogPage(ctx, { categories, products, q, category, state }) {
   return shopLayout(ctx, { title: current ? current.name : 'Boutique', body, state, active: 'shop' });
 }
 
-export function productPage(ctx, { product: p, related, state }) {
+export function productPage(ctx, { product: p, related, state, variants = [] }) {
   const soldOut = p.stock <= 0;
+  const multi = variants.length > 1;
+  const title = multi ? baseName(p.name) : p.name;
   const body = html`
 <div class="wrap">
   <div class="pdp">
-    <div>${productTag(p, { lazy: false })}</div>
+    <div>${productTag(multi ? { ...p, name: title, unit: variantLabel(p) } : p, { lazy: false })}</div>
     <div class="pdp-info">
       <nav class="crumbs" aria-label="Fil d'Ariane"><a href="/boutique">Boutique</a><span>/</span><a href="/boutique?categorie=${p.category_slug}">${p.category_name}</a></nav>
-      <h1 class="h1">${p.name}</h1>
+      <h1 class="h1">${title}</h1>
       <div class="row between wrap-row">
         <span class="pdp-price">${money(p.price_cents)}</span>
         <span class="muted">${p.unit}</span>
       </div>
+      ${multi ? html`<div class="variants" role="radiogroup" aria-label="Format">
+        <span class="variants-label">Format</span>
+        <div class="variants-list">${variants.map((v) => html`<a class="variant ${v.stock <= 0 ? 'out' : ''}" href="/produit/${v.slug}" role="radio" aria-checked="${v.id === p.id}" ${raw(v.id === p.id ? 'aria-current="true"' : '')}>
+          <span class="v-label">${variantLabel(v)}</span><span class="v-price">${money(v.price_cents)}</span>${v.stock <= 0 ? html`<span class="v-out">épuisé</span>` : ''}</a>`)}</div>
+      </div>` : ''}
       ${p.description ? html`<p class="lede" style="font-size:16px">${p.description}</p>` : ''}
       ${p.age_restricted ? html`<p class="legal-note">${icon('shield')}<span>Vente interdite aux mineurs. Pièce d'identité demandée à la livraison.${p.legal_notice ? ` ${p.legal_notice}` : ''}</span></p>` : (p.legal_notice ? html`<p class="legal-note">${icon('info')}<span>${p.legal_notice}</span></p>` : '')}
       <div class="pdp-actions">
@@ -69,7 +77,7 @@ export function productPage(ctx, { product: p, related, state }) {
   </div>
   ${related.length ? html`<section class="section" style="padding-top:0"><div class="section-head"><h2 class="h2">Dans le même rayon</h2></div><div class="product-grid">${related.map(productCard)}</div></section>` : ''}
 </div>`;
-  return shopLayout(ctx, { title: p.name, description: `${p.name} — ${p.unit}. ${p.description}`.slice(0, 160), body, state, active: 'shop' });
+  return shopLayout(ctx, { title, description: `${title} — ${multi ? variants.map(variantLabel).join(', ') : p.unit}. ${p.description}`.slice(0, 160), body, state, active: 'shop' });
 }
 
 export { raw };

@@ -68,6 +68,7 @@ export function productTag(p, { lazy = true } = {}) {
 }
 
 export function productCard(p) {
+  if (p.variant_count > 1) return variantCard(p);
   const soldOut = p.stock <= 0;
   const low = !soldOut && p.stock <= 5;
   return html`<article class="product ${soldOut ? 'soldout' : ''}" data-product="${p.id}">
@@ -81,6 +82,26 @@ export function productCard(p) {
       <div class="product-foot">
         <span class="product-price price">${money(p.price_cents)}</span>
         ${soldOut ? '' : addControl(p)}
+      </div>
+    </div>
+  </article>`;
+}
+
+/** Carte d'un produit à plusieurs formats : on choisit le format sur la fiche. */
+function variantCard(p) {
+  const soldOut = p.stock <= 0;
+  const labels = p.variants.map((v) => v.name.split(/\s+[—–-]\s+/).pop());
+  return html`<article class="product ${soldOut ? 'soldout' : ''}" data-product="${p.id}">
+    <a class="product-media" href="/produit/${p.slug}" tabindex="-1" aria-hidden="true">
+      ${soldOut ? html`<span class="product-flag">Épuisé</span>` : ''}
+      ${productTag({ ...p, name: p.group_name, unit: `${p.variant_count} formats` })}
+    </a>
+    <div class="product-body">
+      <a class="product-name" href="/produit/${p.slug}">${p.group_name}</a>
+      <span class="product-unit">${labels.join(' · ')}</span>
+      <div class="product-foot">
+        <span class="product-price price"><span class="from">dès</span> ${money(p.min_price_cents)}</span>
+        ${soldOut ? '' : html`<a class="add-btn" href="/produit/${p.slug}" aria-label="Choisir le format de ${p.group_name}">${icon('arrow')}<span class="add-label">Choisir</span></a>`}
       </div>
     </div>
   </article>`;

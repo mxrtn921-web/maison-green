@@ -4,7 +4,16 @@ import { sendHtml, sendJson, redirect, setFlash, HttpError, clientIp, isBot } fr
 import { rateLimit } from '../auth.js';
 import { subscribe } from '../lib/events.js';
 import { all } from '../db.js';
-import { categories, shopProducts, featuredProducts, productBySlug, quoteCart } from '../services/catalog.js';
+import { categories as rawCategories, shopProducts as rawShopProducts, featuredProducts, productBySlug, quoteCart, groupVariants, siblingsOf, baseName, norm } from '../services/catalog.js';
+
+// Boutique : les variantes (« Amnesia — 1 g / 5 g / 10 g ») sont regroupées en une seule fiche, et les compteurs de rayon suivent.
+const shopProducts = (opts) => groupVariants(rawShopProducts(opts));
+const categories = (opts = {}) => {
+  const cats = rawCategories(opts);
+  if (!opts.withCounts) return cats;
+  const n = new Map(); for (const p of shopProducts()) n.set(p.category_id, (n.get(p.category_id) || 0) + 1);
+  return cats.map((c) => ({ ...c, product_count: n.get(c.id) || 0 }));
+};
 import { zones, zoneForPostal, deliveryFee, availableSlots, orderingState, hoursSummary } from '../services/delivery.js';
 import { createOrder, getOrderByToken, orderItems, orderEvents, markPaid, markPaymentFailed } from '../services/orders.js';
 import { startCheckout, confirmCheckoutSession, verifyWebhook, handleWebhookEvent } from '../services/payments.js';
@@ -32,9 +41,9 @@ get('/sitemap.xml', (ctx) => {
 
 get('/', (ctx) => {
   const cats = categories({ withCounts: true }).filter((c) => c.product_count > 0);
-  const featured = featuredProducts(8);
+  const featured = groupVariants(featuredProducts(24)).slice(0, 8);
   // Étagère de l'accueil : un produit par rayon, pour montrer la palette d'étiquettes.
-  const shelf = cats.slice(0, 6).map((c) => shopProducts({ category: c.slug }).find((p) => p.is_featured) || shopProducts({ category: c.slug })[0]).filter(Boolean);
+  const shelf = cats.slice(0, 6).map((c) => shopProducts({ category: c.slug }).find((p) => p.is_featured) || shopProducts({ category: c.slug })[0]).filter(Boolean).map((p) => (p.group_name ? { ...p, name: p.group_name, unit: `${p.variant_count} formats` } : p));
   sendHtml(ctx.res, homePage(ctx, { categories: cats, featured, zones: zones(), hours: hoursSummary(), state: orderingState(), shelf }));
 });
 
@@ -48,8 +57,8 @@ get('/boutique', (ctx) => {
 get('/produit/:slug', (ctx) => {
   const p = productBySlug(ctx.params.slug);
   if (!p) throw new HttpError(404, 'Ce produit n’existe pas ou n’est plus disponible.');
-  const related = shopProducts({ category: p.category_slug }).filter((x) => x.id !== p.id).slice(0, 4);
-  sendHtml(ctx.res, productPage(ctx, { product: p, related, state: orderingState() }));
+  const related = shopProducts({ category: p.category_slug }).filter((x) => norm(baseName(x.name)) !== norm(baseName(p.name))).slice(0, 4);
+  sendHtml(ctx.res, productPage(ctx, { product: p, related, state: orderingState(), variants: siblingsOf(p) }));
 });
 
 get('/commande', (ctx) => {

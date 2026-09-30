@@ -780,3 +780,17 @@ body:has(.cart-bar:not([hidden])) .cookie-note { bottom: calc(80px + env(safe-ar
 /* Mention légale d'un rayon (alcool, CBD…) */
 .legal-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); background: var(--stone); border-radius: var(--r-sm); padding: 10px 12px; }
 .legal-note .icon { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+
+/* Fiche produit : choix du format (variantes) */
+.variants { display: grid; gap: 8px; margin: 18px 0 4px; }
+.variants-label { font-size: 13px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.variants-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.variant { display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center; min-width: 88px; min-height: 52px; padding: 8px 14px; border: 1.5px solid var(--line-strong); border-radius: var(--r); background: var(--paper); color: var(--ink); text-decoration: none; line-height: 1.2; }
+.variant:hover { border-color: var(--ink); }
+.variant[aria-current="true"] { border-color: var(--green); background: var(--green-tint); box-shadow: inset 0 0 0 1px var(--green); }
+.variant .v-label { font-weight: 700; font-size: 15px; }
+.variant .v-price { font-size: 13.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.variant.out { opacity: .55; }
+.variant .v-out { font-size: 12px; color: var(--danger); }
+.product-price .from { font-size: 12px; font-weight: 500; color: var(--ink-3); margin-right: 2px; }
+a.add-btn { text-decoration: none; }

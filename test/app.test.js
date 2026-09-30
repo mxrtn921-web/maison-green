@@ -470,6 +470,28 @@ test('rayons réservés aux majeurs (alcool, CBD) : case 18 ans obligatoire et c
   assert.match(page, /Vente interdite aux mineurs/); assert.match(page, /consommer avec modération/);
 });
 
+test('variantes : une seule fiche « Nom » avec le choix des formats', async () => {
+  const admin = client(); await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const csv = 'nom;rayon;prix;format;stock\nAmnesia test — 1 g;CBD test;7,00;1 g;10\nAmnesia test — 5 g;CBD test;30,00;5 g;10\nAmnesia test — 10 g;CBD test;56,00;10 g;0\n';
+  const fd = new FormData(); fd.set('mode', 'maj'); fd.set('fichier', new Blob([csv], { type: 'text/csv' }), 'v.csv');
+  const prev = await admin.post('/admin/produits/import', { multipart: fd });
+  const token = /name="token" value="([^"]+)"/.exec(prev.text)[1];
+  assert.equal((await admin.post('/admin/produits/import', { form: { token } })).status, 303);
+  const c = client();
+  const shop = (await c.get('/boutique?categorie=cbd-test')).text;
+  assert.equal((shop.match(/class="product-name"/g) || []).length, 1, 'une seule carte pour les 3 formats');
+  assert.match(shop, /Amnesia test<\/a>/); assert.match(shop, /1 g · 5 g · 10 g/); assert.match(shop, /dès<\/span> 7,00/);
+  assert.match(shop, /CBD test <span class="n">1<\/span>/);
+  const slug = /href="\/produit\/([^"]+)"/.exec(shop)[1];
+  const page = (await c.get(`/produit/${slug}`)).text;
+  assert.match(page, /<h1 class="h1">Amnesia test<\/h1>/);
+  assert.equal((page.match(/class="variant /g) || []).length + (page.match(/class="variant"/g) || []).length, 3);
+  assert.match(page, /aria-current="true"[\s\S]{0,200}1 g/); assert.match(page, /épuisé/);
+  const five = /href="\/produit\/([^"]+)"[^>]*>\s*<span class="v-label">5 g/.exec(page)[1];
+  const p5 = (await c.get(`/produit/${five}`)).text;
+  assert.match(p5, /pdp-price">30,00/);
+});
+
 test('qualité du site : CGU, sitemap, robots, compression, favicon, anti-spam, statistiques anonymes', async () => {
   const c = client();
   // pages légales et référencement
