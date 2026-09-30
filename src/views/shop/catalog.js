@@ -20,6 +20,7 @@ export function catalogPage(ctx, { categories, products, q, category, state }) {
 <div class="wrap shop-head">
   <h1 class="h1">${current ? current.name : 'La boutique'}</h1>
   ${current?.description ? html`<p class="muted mt-8">${current.description}</p>` : ''}
+  ${current && (current.age_restricted || current.legal_notice) ? html`<p class="legal-note mt-8">${icon('shield')}<span>${current.age_restricted ? 'Vente interdite aux mineurs. ' : ''}${current.legal_notice}</span></p>` : ''}
 </div>
 <div class="shop-tools">
   <div class="wrap">
@@ -53,6 +54,7 @@ export function productPage(ctx, { product: p, related, state }) {
         <span class="muted">${p.unit}</span>
       </div>
       ${p.description ? html`<p class="lede" style="font-size:16px">${p.description}</p>` : ''}
+      ${p.age_restricted ? html`<p class="legal-note">${icon('shield')}<span>Vente interdite aux mineurs. Pièce d'identité demandée à la livraison.${p.legal_notice ? ` ${p.legal_notice}` : ''}</span></p>` : (p.legal_notice ? html`<p class="legal-note">${icon('info')}<span>${p.legal_notice}</span></p>` : '')}
       <div class="pdp-actions">
         ${soldOut ? html`<span class="badge b-cancelled plain">Épuisé pour le moment</span>` : addControl(p, true)}
         ${!soldOut && p.stock <= 5 ? html`<span class="small" style="color:var(--warn)">Plus que ${p.stock} en stock</span>` : ''}

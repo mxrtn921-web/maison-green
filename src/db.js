@@ -13,7 +13,9 @@ db.exec(fs.readFileSync(path.join(ROOT, 'src', 'schema.sql'), 'utf8'));
 
 // Migrations légères : colonnes ajoutées après la mise en ligne.
 const hasColumn = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
-for (const [table, col, def] of [['push_subscriptions', 'p256dh', "TEXT NOT NULL DEFAULT ''"], ['push_subscriptions', 'auth', "TEXT NOT NULL DEFAULT ''"]]) {
+for (const [table, col, def] of [['push_subscriptions', 'p256dh', "TEXT NOT NULL DEFAULT ''"], ['push_subscriptions', 'auth', "TEXT NOT NULL DEFAULT ''"],
+  ['categories', 'age_restricted', 'INTEGER NOT NULL DEFAULT 0'], ['categories', 'legal_notice', "TEXT NOT NULL DEFAULT ''"],
+  ['orders', 'age_check', 'INTEGER NOT NULL DEFAULT 0']]) {
   if (!hasColumn(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
 }
 

@@ -336,18 +336,18 @@ const TONES = ['sage', 'sky', 'sand', 'blush', 'butter', 'stone'];
 get('/admin/categories', (ctx) => { admin(ctx); sendHtml(ctx.res, V.categoriesPage(ctx, { categories: listCategories({ withCounts: true, includeInactive: true }) })); });
 post('/admin/categories', (ctx) => {
   admin(ctx);
-  const { data, errors, ok } = validate({ name: v.text({ label: 'Le nom', max: 60 }), description: v.text({ required: false, max: 160 }), tone: v.oneOf(TONES) }, ctx.body);
+  const { data, errors, ok } = validate({ name: v.text({ label: 'Le nom', max: 60 }), description: v.text({ required: false, max: 160 }), tone: v.oneOf(TONES), age_restricted: v.bool(), legal_notice: v.text({ required: false, max: 300 }) }, ctx.body);
   if (!ok) return sendHtml(ctx.res, V.categoriesPage(ctx, { categories: listCategories({ withCounts: true, includeInactive: true }), errors }), 422);
   let slug = slugify(data.name); if (one('SELECT 1 AS x FROM categories WHERE slug = ?', slug)) slug += `-${Date.now().toString(36)}`;
-  run('INSERT INTO categories (name, slug, description, tone, position) VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(position),0)+1 FROM categories))', data.name, slug, data.description, data.tone);
+  run('INSERT INTO categories (name, slug, description, tone, position, age_restricted, legal_notice) VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(position),0)+1 FROM categories), ?, ?)', data.name, slug, data.description, data.tone, data.age_restricted ? 1 : 0, data.legal_notice || '');
   setFlash(ctx.res, 'success', 'Catégorie ajoutée.');
   redirect(ctx.res, '/admin/categories');
 });
 post('/admin/categories/:id', (ctx) => {
   admin(ctx);
-  const { data, ok, errors } = validate({ name: v.text({ label: 'Le nom', max: 60 }), description: v.text({ required: false, max: 160 }), tone: v.oneOf(TONES), position: v.int({ label: "L'ordre", max: 999 }), is_active: v.bool() }, ctx.body);
+  const { data, ok, errors } = validate({ name: v.text({ label: 'Le nom', max: 60 }), description: v.text({ required: false, max: 160 }), tone: v.oneOf(TONES), position: v.int({ label: "L'ordre", max: 999 }), is_active: v.bool(), age_restricted: v.bool(), legal_notice: v.text({ required: false, max: 300 }) }, ctx.body);
   if (!ok) { setFlash(ctx.res, 'error', Object.values(errors)[0]); return redirect(ctx.res, '/admin/categories'); }
-  run('UPDATE categories SET name = ?, description = ?, tone = ?, position = ?, is_active = ? WHERE id = ?', data.name, data.description, data.tone, data.position, data.is_active ? 1 : 0, Number(ctx.params.id));
+  run('UPDATE categories SET name = ?, description = ?, tone = ?, position = ?, is_active = ?, age_restricted = ?, legal_notice = ? WHERE id = ?', data.name, data.description, data.tone, data.position, data.is_active ? 1 : 0, data.age_restricted ? 1 : 0, data.legal_notice || '', Number(ctx.params.id));
   setFlash(ctx.res, 'success', 'Catégorie enregistrée.');
   redirect(ctx.res, '/admin/categories');
 });

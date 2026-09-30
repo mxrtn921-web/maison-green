@@ -7,7 +7,7 @@ export const categories = ({ withCounts = false, includeInactive = false } = {})
   all(`SELECT c.*${withCounts ? `, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.is_active = 1 AND p.deleted_at IS NULL) AS product_count` : ''}
        FROM categories c ${includeInactive ? '' : 'WHERE c.is_active = 1'} ORDER BY c.position, c.name`);
 
-const BASE = `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.tone AS tone
+const BASE = `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.tone AS tone, c.age_restricted AS age_restricted, c.legal_notice AS legal_notice
               FROM products p LEFT JOIN categories c ON c.id = p.category_id`;
 
 /** Produits visibles côté client (actifs, catégorie active). */
@@ -56,9 +56,9 @@ export function quoteCart(items) {
     const qty = Math.min(wanted, max);
     if (qty < wanted) issues.push({ id, type: 'limited', message: `${p.name} : ${max} maximum disponible${max > 1 ? 's' : ''}, quantité ajustée.` });
     lines.push({ id: p.id, slug: p.slug, name: p.name, unit: p.unit, image_url: p.image_url, tone: p.tone, category: p.category_name,
-      unit_price_cents: p.price_cents, quantity: qty, max, line_total_cents: qty * p.price_cents });
+      unit_price_cents: p.price_cents, quantity: qty, max, line_total_cents: qty * p.price_cents, adult: Boolean(p.age_restricted) });
   }
   const subtotal = lines.reduce((s, l) => s + l.line_total_cents, 0);
   const count = lines.reduce((s, l) => s + l.quantity, 0);
-  return { lines, issues, subtotal, count };
+  return { lines, issues, subtotal, count, adult: lines.some((l) => l.adult) };
 }

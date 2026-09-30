@@ -86,6 +86,8 @@ export function createOrder(input, user) {
   const quote = quoteCart(input.items);
   if (!quote.lines.length) throw new HttpError(422, 'Votre panier est vide.', { errors });
   if (quote.issues.length) errors.cart = quote.issues.map((i) => i.message).join(' ');
+  const adultOk = input.adult_ok === true || input.adult_ok === 'on' || input.adult_ok === '1' || input.adult_ok === 'true';
+  if (quote.adult && !adultOk) errors.adult_ok = 'Votre panier contient des produits réservés aux personnes majeures : merci de confirmer que vous avez 18 ans ou plus.';
 
   const zone = zoneForPostal(data.postal_code);
   if (!errors.postal_code && !zone) errors.postal_code = 'Nous ne livrons pas encore ce code postal. Consultez nos zones de livraison.';
@@ -117,7 +119,7 @@ export function createOrder(input, user) {
       data.address_line1, data.address_line2, data.postal_code, data.city, data.instructions, zone.id, zone.name, slot.date, slot.start, slot.end,
       quote.subtotal, fee, total);
     const id = Number(r.lastInsertRowid);
-    run('UPDATE orders SET number = ? WHERE id = ?', `MG-${1000 + id}`, id);
+    run('UPDATE orders SET number = ?, age_check = ? WHERE id = ?', `MG-${1000 + id}`, quote.adult ? 1 : 0, id);
     for (const l of quote.lines) {
       run('INSERT INTO order_items (order_id, product_id, name, unit, unit_price_cents, quantity, line_total_cents) VALUES (?, ?, ?, ?, ?, ?, ?)',
         id, l.id, l.name, l.unit, l.unit_price_cents, l.quantity, l.line_total_cents);

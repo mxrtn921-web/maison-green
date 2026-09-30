@@ -441,6 +441,35 @@ test('admin : nouveau mot de passe pour un livreur', async () => {
   assert.equal((await client().post(`/admin/livreurs/${id}/mot-de-passe`)).status, 303, 'réservé à l’admin');
 });
 
+test('rayons réservés aux majeurs (alcool, CBD) : case 18 ans obligatoire et contrôle d’âge signalé', async () => {
+  const admin = client(); await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  // menu mobile de l'admin : toutes les rubriques présentes
+  const dash = (await admin.get('/admin')).text;
+  assert.match(dash, /<details class="mobile-nav">/); assert.match(dash, /mobile-nav[\s\S]*\/admin\/livreurs[\s\S]*<\/details>/);
+  assert.equal((await admin.post('/admin/categories', { form: { name: 'Alcools', description: 'Vins, bières et spiritueux', tone: 'butter', age_restricted: 'on', legal_notice: 'L’abus d’alcool est dangereux pour la santé, à consommer avec modération.' } })).status, 303);
+  const cats = (await admin.get('/admin/categories')).text;
+  const catId = /action="\/admin\/categories\/(\d+)"[^>]*>[\s\S]{0,400}value="Alcools"/.exec(cats)[1];
+  const form = new FormData();
+  for (const [k, val] of Object.entries({ name: 'Cidre test 18+', category_id: catId, price: '4,50', unit: '75 cl', stock: '20', max_per_order: '10', is_active: 'on' })) form.set(k, val);
+  const created = await admin.post('/admin/produits/nouveau', { multipart: form });
+  assert.equal(created.status, 303, created.text.slice(0, 300));
+  const pid = Number(/\/admin\/produits\/(\d+)/.exec(created.location)?.[1] || /\/produit\/([\w-]+)/.exec(created.location)?.[1]);
+  const shop = client();
+  const product = (await shop.get('/boutique?q=Cidre%20test')).text;
+  const id = Number(/data-add="(\d+)"[\s\S]{0,600}?Cidre test 18\+|Cidre test 18\+[\s\S]{0,600}?data-add="(\d+)"/.exec(product)?.slice(1).find(Boolean) || pid);
+  const quote = (await shop.post('/api/cart/quote', { json: { items: [{ id, qty: 4 }] } })).data;
+  assert.equal(quote.adult, true);
+  const base = checkout(await firstSlot(shop), { items: [{ id, qty: 4 }] });
+  const refused = await shop.post('/api/orders', { json: base });
+  assert.equal(refused.status, 422); assert.ok(refused.data.errors.adult_ok);
+  const ok = await shop.post('/api/orders', { json: { ...base, adult_ok: true } });
+  assert.equal(ok.status, 201, JSON.stringify(ok.data));
+  const orderId = Number((await shop.get(ok.data.redirect)).text.match(/MG-(\d+)/)[1]) - 1000;
+  assert.match((await admin.get(`/admin/commandes/${orderId}`)).text, /Contrôle d'âge obligatoire/);
+  const page = (await shop.get(`/boutique?categorie=alcools`)).text;
+  assert.match(page, /Vente interdite aux mineurs/); assert.match(page, /consommer avec modération/);
+});
+
 test('qualité du site : CGU, sitemap, robots, compression, favicon, anti-spam, statistiques anonymes', async () => {
   const c = client();
   // pages légales et référencement

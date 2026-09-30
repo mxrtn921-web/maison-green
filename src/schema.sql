@@ -56,7 +56,9 @@ CREATE TABLE IF NOT EXISTS categories (
   description TEXT NOT NULL DEFAULT '',
   tone        TEXT NOT NULL DEFAULT 'sage',   -- teinte de l'étiquette
   position    INTEGER NOT NULL DEFAULT 0,
-  is_active   INTEGER NOT NULL DEFAULT 1
+  is_active   INTEGER NOT NULL DEFAULT 1,
+  age_restricted INTEGER NOT NULL DEFAULT 0,   -- rayon réservé aux 18 ans et plus (alcool, CBD…)
+  legal_notice   TEXT NOT NULL DEFAULT ''      -- mention obligatoire affichée sur les produits du rayon
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -152,7 +154,8 @@ CREATE TABLE IF NOT EXISTS orders (
   cancel_reason   TEXT,
   internal_note   TEXT NOT NULL DEFAULT '',
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  age_check INTEGER NOT NULL DEFAULT 0   -- commande avec produits réservés aux majeurs : contrôle d'âge à la livraison
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);

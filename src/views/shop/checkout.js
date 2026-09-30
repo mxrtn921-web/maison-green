@@ -67,6 +67,10 @@ export function checkoutPage(ctx, { days, zones, addresses, state }) {
         <div class="hp" aria-hidden="true"><label for="hp-website">Laissez ce champ vide</label><input id="hp-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
         <label class="check mt-24"><input type="checkbox" name="accept_terms" required> <span>J'accepte les <a class="link" href="/cgv" target="_blank">conditions générales de vente</a> et la <a class="link" href="/confidentialite" target="_blank">politique de confidentialité</a>.</span></label>
         <p class="error-text mt-8" data-err="accept_terms" hidden></p>
+        <div data-adult-box hidden>
+          <label class="check mt-16"><input type="checkbox" name="adult_ok"> <span><strong>J'ai 18 ans ou plus.</strong> Votre panier contient des produits interdits aux mineurs (alcool, CBD…) : une pièce d'identité vous sera demandée à la livraison.</span></label>
+          <p class="error-text mt-8" data-err="adult_ok" hidden></p>
+        </div>
       </section>
 
       <div class="mobile-pay">

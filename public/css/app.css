@@ -757,3 +757,26 @@ body:has(.cart-bar:not([hidden])) .cookie-note { bottom: calc(80px + env(safe-ar
 /* Statistiques : trois tableaux alignés */
 .stats-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; }
 .stats-grid > .panel { margin: 0; }
+
+/* Admin sur téléphone : bouton « Menu » qui déplie toutes les rubriques (au lieu d'une bande qui défile de côté) */
+.mobile-nav { display: none; }
+@media (max-width: 999.98px) {
+  .side-nav { display: none; }
+  .mobile-nav { display: block; padding: 0 12px 10px; }
+  .mobile-nav summary { list-style: none; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); font-weight: 600; cursor: pointer; }
+  .mobile-nav summary::-webkit-details-marker { display: none; }
+  .mobile-nav summary .current { margin-left: auto; color: var(--ink-3); font-weight: 500; }
+  .mobile-nav summary .icon { width: 18px; height: 18px; }
+  .mobile-nav summary .icon:last-child { transition: transform .15s var(--ease); transform: rotate(90deg); }
+  .mobile-nav[open] summary .icon:last-child { transform: rotate(-90deg); }
+  .mobile-nav nav { display: grid; gap: 2px; margin-top: 8px; padding: 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); max-height: calc(100dvh - 140px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .mobile-nav nav a, .mobile-nav nav button { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: var(--r-sm); text-decoration: none; color: var(--ink-2); font: inherit; font-weight: 500; background: none; border: 0; width: 100%; text-align: left; cursor: pointer; }
+  .mobile-nav nav a[aria-current="page"] { background: var(--ink); color: #fff; }
+  .mobile-nav nav .icon { width: 18px; height: 18px; }
+  .mobile-nav nav .count { margin-left: auto; font-size: 12px; font-weight: 700; background: var(--green); color: #fff; border-radius: 99px; padding: 1px 7px; }
+  .mobile-nav nav form { margin: 0; border-top: 1px solid var(--line); padding-top: 2px; }
+}
+
+/* Mention légale d'un rayon (alcool, CBD…) */
+.legal-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); background: var(--stone); border-radius: var(--r-sm); padding: 10px 12px; }
+.legal-note .icon { width: 16px; height: 16px; flex: none; margin-top: 2px; }

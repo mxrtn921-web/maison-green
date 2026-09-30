@@ -33,6 +33,14 @@ export function adminLayout(ctx, { title, active, body }) {
     <nav class="side-nav" aria-label="Administration">
       ${nav.map(([href, label, ic, key, count]) => html`<a href="${href}" ${raw(active === key ? 'aria-current="page"' : '')}>${icon(ic)}<span>${label}</span>${count ? html`<span class="count" ${raw(key === 'orders' ? 'data-pending-count' : '')}>${count}</span>` : ''}</a>`)}
     </nav>
+    <details class="mobile-nav">
+      <summary>${icon('grid')}<span>Menu</span><span class="current">${(nav.find((n) => n[3] === active) || [])[1] || ''}</span>${icon('chevron')}</summary>
+      <nav aria-label="Administration (mobile)">
+        ${nav.map(([href, label, ic, key, count]) => html`<a href="${href}" ${raw(active === key ? 'aria-current="page"' : '')}>${icon(ic)}<span>${label}</span>${count ? html`<span class="count">${count}</span>` : ''}</a>`)}
+        <a href="/" target="_blank">${icon('external')}<span>Voir la boutique</span></a>
+        <form method="post" action="/deconnexion"><button>${icon('logout')}<span>Déconnexion (${ctx.user.first_name})</span></button></form>
+      </nav>
+    </details>
     <div class="side-foot">
       <a href="/" target="_blank">${icon('external')} Voir la boutique</a>
       <form method="post" action="/deconnexion"><button class="btn btn-quiet btn-sm" style="width:100%;justify-content:flex-start;color:var(--ink-3)">${icon('logout')} Déconnexion (${ctx.user.first_name})</button></form>

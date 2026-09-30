@@ -128,6 +128,7 @@ export function orderDetailPage(ctx, { order: o, items, events, drivers, payment
   <div class="order-layout">
     <div class="panels">
       ${o.payment_method === 'cash' && o.payment_status === 'due_on_delivery' ? html`<div class="notice notice-warn">${icon('cash')}<span><strong>Paiement en espèces à la livraison</strong> — le livreur doit encaisser <strong>${money(o.cash_to_collect_cents)}</strong>.</span></div>` : ''}
+      ${o.age_check ? html`<div class="notice notice-warn" role="alert">${icon('shield')}<span><strong>Contrôle d'âge obligatoire</strong> — la commande contient des produits réservés aux majeurs (alcool, CBD…). Vérifiez la pièce d'identité du client et ne remettez rien à un mineur.</span></div>` : ''}
       ${o.status === 'awaiting_payment' ? html`<div class="notice">${icon('clock')}<span>Le client n'a pas encore finalisé son paiement par carte. La commande sera annulée automatiquement après 45 minutes et le stock libéré.</span></div>` : ''}
       <section class="panel">
         <div class="panel-head"><h2>${items.reduce((s, i) => s + i.quantity, 0)} articles</h2><span class="small muted">Liste de préparation</span></div>
@@ -330,6 +331,8 @@ export function categoriesPage(ctx, { categories, errors = {} }) {
     <select class="select" name="tone" aria-label="Teinte" style="flex:0 1 140px">${TONES.map(([k, l]) => html`<option value="${k}" ${sel(k, c.tone)}>${l}</option>`)}</select>
     <input class="input" name="position" type="number" value="${c.position}" aria-label="Ordre" style="flex:0 0 72px">
     <label class="switch" title="Visible"><input type="checkbox" name="is_active" ${chk(c.is_active)}><span class="small">${c.product_count} produits</span></label>
+    <label class="switch" title="Réservé aux 18 ans et plus"><input type="checkbox" name="age_restricted" ${chk(c.age_restricted)}><span class="small">18+</span></label>
+    <input class="input" name="legal_notice" value="${c.legal_notice || ''}" aria-label="Mention légale" placeholder="Mention légale (facultatif)" style="flex:1 1 100%">
     <button class="btn btn-ghost btn-sm">Enregistrer</button>
     <button class="btn btn-quiet btn-sm" formaction="/admin/categories/${c.id}/supprimer" aria-label="Supprimer ${c.name}" data-confirm-click="Supprimer la catégorie « ${c.name} » ?">${icon('trash')}</button>
   </form>`;
@@ -341,6 +344,8 @@ export function categoriesPage(ctx, { categories, errors = {} }) {
       <input class="input" name="name" placeholder="Nom (ex. Surgelés)" required style="flex:2 1 200px">
       <input class="input" name="description" placeholder="Description courte" style="flex:3 1 240px">
       <select class="select" name="tone" style="flex:0 1 140px">${TONES.map(([k, l]) => html`<option value="${k}">${l}</option>`)}</select>
+      <label class="switch" title="Réservé aux 18 ans et plus"><input type="checkbox" name="age_restricted"><span class="small">18+</span></label>
+      <input class="input" name="legal_notice" placeholder="Mention légale (facultatif)" style="flex:1 1 100%">
       <button class="btn btn-dark btn-sm">${icon('plus')} Ajouter</button>
     </form>${fieldErr(errors, 'name')}
   </div></section>`;

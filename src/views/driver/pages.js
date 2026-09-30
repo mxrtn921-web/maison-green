@@ -70,6 +70,7 @@ export function driverRunPage(ctx, { driver, order: o, items }) {
   const body = html`<div class="driver-detail">
     <a class="small muted" href="/livreur?onglet=${mine ? 'mes-courses' : 'disponibles'}" style="text-decoration:none">${icon('back')} Retour</a>
     <div class="row between"><h1 class="h2">${o.number}</h1>${statusBadge(o.status)}</div>
+    ${o.age_check ? html`<div class="notice notice-warn" role="alert">${icon('shield')}<span><strong>Contrôle d'âge obligatoire</strong> — la commande contient des produits réservés aux majeurs (alcool, CBD…). Vérifiez la pièce d'identité du client et ne remettez rien à un mineur.</span></div>` : ''}
     ${cash ? html`<div class="cash-banner" role="alert"><div><div class="l">À encaisser</div><div class="v">${money(o.cash_to_collect_cents)}</div></div>${icon('cash')}</div>`
       : html`<div class="notice notice-success">${icon('check')}<span>Commande déjà payée par carte. Rien à encaisser.</span></div>`}
     <div class="panel"><div class="panel-body stack" style="--s:12px">

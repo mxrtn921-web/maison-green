@@ -326,6 +326,8 @@
   // ——— Commande ———————————————————————————————————————————————
   const co = $('[data-checkout-form]');
   function renderSummary() {
+    const adultBox = $('[data-adult-box]');
+    if (adultBox) { const need = Boolean(quote?.adult); adultBox.hidden = !need; const cb = $('input[name="adult_ok"]', adultBox); if (cb) cb.required = need; }
     const box = $('[data-summary-lines]');
     if (!box) return;
     if (!memory.length) { box.innerHTML = '<p class="muted small" style="padding:12px 0">Votre panier est vide. <a class="link" href="/boutique">Retour à la boutique</a></p>'; $('[data-summary-totals]').innerHTML = ''; $('[data-submit]').disabled = true; return; }
@@ -378,7 +380,7 @@
       const btn = $('[data-submit]'); const label = $('[data-submit-label]'); const prev = label.textContent;
       btn.disabled = true; label.textContent = 'Envoi…';
       const fd = new FormData(co); const body = Object.fromEntries(fd.entries());
-      body.accept_terms = fd.has('accept_terms'); body.save_address = fd.has('save_address'); body.items = memory;
+      body.accept_terms = fd.has('accept_terms'); body.adult_ok = fd.has('adult_ok'); body.save_address = fd.has('save_address'); body.items = memory;
       try {
         const { ok, data: res } = await api('/api/orders', body);
         if (ok && res.redirect) { cart.clear(); location.href = res.redirect; return; }
