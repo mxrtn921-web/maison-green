@@ -67,6 +67,18 @@ export function productTag(p, { lazy = true } = {}) {
     </div></div>`;
 }
 
+
+/** Variétés CBD « puissantes » : 3 petites étoiles dorées à côté du nom. */
+const STRONG_CBD = ['gold moroco', 'gold maroc', 'harlequin', 'red cherry', 'strawberry', 'lemon aze', 'lemon haze', 'candy melon', 'kaly kush', 'kali kush'];
+const flat = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+export const isStrongCbd = (p) => {
+  const n = flat(p.group_name || p.name);
+  const cat = flat(p.category_name || p.category_slug || 'cbd');
+  return cat.includes('cbd') && STRONG_CBD.some((k) => n === k || n.startsWith(k + ' '));
+};
+export const stars = (p) => (isStrongCbd(p)
+  ? raw('<span class="stars" role="img" aria-label="Puissant : 3 étoiles">\u2605\u2605\u2605</span>') : '');
+
 export function productCard(p) {
   if (p.variant_count > 1) return variantCard(p);
   const soldOut = p.stock <= 0;
@@ -77,7 +89,7 @@ export function productCard(p) {
       ${productTag(p)}
     </a>
     <div class="product-body">
-      <a class="product-name" href="/produit/${p.slug}">${p.name}</a>
+      <a class="product-name" href="/produit/${p.slug}">${p.name}${stars(p)}</a>
       <span class="product-unit">${p.unit}</span>
       <div class="product-foot">
         <span class="product-price price">${money(p.price_cents)}</span>
@@ -97,7 +109,7 @@ function variantCard(p) {
       ${productTag({ ...p, name: p.group_name, unit: `${p.variant_count} formats` })}
     </a>
     <div class="product-body">
-      <a class="product-name" href="/produit/${p.slug}">${p.group_name}</a>
+      <a class="product-name" href="/produit/${p.slug}">${p.group_name}${stars(p)}</a>
       <span class="product-unit">${labels.join(' · ')}</span>
       <div class="product-foot">
         <span class="product-price price"><span class="from">dès</span> ${money(p.min_price_cents)}</span>

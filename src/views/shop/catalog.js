@@ -1,5 +1,5 @@
 import { html, raw, money } from '../../lib/html.js';
-import { icon, productCard, productTag, addControl } from '../ui.js';
+import { icon, productCard, productTag, addControl, stars } from '../ui.js';
 import { shopLayout } from './layout.js';
 import { baseName, variantLabel } from '../../services/catalog.js';
 
@@ -51,7 +51,7 @@ export function productPage(ctx, { product: p, related, state, variants = [] }) 
     <div>${productTag(multi ? { ...p, name: title, unit: variantLabel(p) } : p, { lazy: false })}</div>
     <div class="pdp-info">
       <nav class="crumbs" aria-label="Fil d'Ariane"><a href="/boutique">Boutique</a><span>/</span><a href="/boutique?categorie=${p.category_slug}">${p.category_name}</a></nav>
-      <h1 class="h1">${title}</h1>
+      <h1 class="h1">${title}${stars({ ...p, name: title })}</h1>
       <div class="row between wrap-row">
         <span class="pdp-price">${money(p.price_cents)}</span>
         <span class="muted">${p.unit}</span>

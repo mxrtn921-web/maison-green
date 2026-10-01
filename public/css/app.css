@@ -832,3 +832,7 @@ a.add-btn { text-decoration: none; }
 /* Rayons : léger relief au survol */
 .cat-tile { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 8%, transparent); }
 @media (hover: hover) { .cat-tile:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 16%, transparent), 0 10px 24px -16px rgba(23, 24, 26, .3); } }
+
+/* Étoiles dorées : variétés CBD puissantes */
+.stars { display: inline-block; margin-left: 6px; color: #d9a521; font-size: .8em; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 0 1px rgba(160,110,0,.35); vertical-align: 1px; }
+.pdp .stars { font-size: .55em; margin-left: 10px; }
