@@ -181,20 +181,21 @@ post('/compte/supprimer', (ctx) => {
 // ——— Pages légales ——————————————————————————————————————————
 // Valeurs du Kbis utilisées tant que les champs correspondants ne sont pas remplis dans l'admin.
 const LEGAL_DEFAULTS = {
-  legal_name: 'MOAN', legal_form: 'société par actions simplifiée (SAS)', legal_capital: '200', legal_siren: '988 836 037',
-  legal_rcs: 'Rouen', legal_tva: 'FR94 988 836 037', legal_manager: 'Mourad Djelassi', legal_siege: '27 rue du Général Leclerc, 76000 Rouen',
+  legal_name: 'MOAN', legal_form: 'société par actions simplifiée (SAS)', legal_capital: '200', legal_siren: '988 836 037', legal_siret: '988 836 037 00016',
+  legal_rcs: 'Rouen', legal_tva: '', legal_manager: 'Mourad Djelassi', legal_siege: '27 rue du Général Leclerc, 76000 Rouen',
   legal_mediator: '',
 };
 const fillLegal = (text) => {
   const s = shopInfo();
   const val = (k) => (s[k] && String(s[k]).trim()) || LEGAL_DEFAULTS[k] || '';
   const raison = val('legal_name') === 'Maison Green' ? LEGAL_DEFAULTS.legal_name : val('legal_name');
-  const editeur = `${raison}, ${val('legal_form')}${val('legal_capital') ? ` au capital de ${val('legal_capital')} €` : ''}, immatriculée au RCS de ${val('legal_rcs')} sous le numéro ${val('legal_siren')}, exploitant l’enseigne Maison Green, dont le siège social est situé ${val('legal_siege')}.`;
+  const editeur = `${raison}, ${val('legal_form')}${val('legal_capital') ? ` au capital de ${val('legal_capital')} €` : ''}, immatriculée au RCS de ${val('legal_rcs')} sous le numéro ${val('legal_siren')}${val('legal_siren').replace(/\s/g, '') === '988836037' ? ` (SIRET ${LEGAL_DEFAULTS.legal_siret})` : ''}, exploitant l’enseigne Maison Green, dont le siège social est situé ${val('legal_siege')}.`;
   const mediateur = val('legal_mediator') || 'médiateur en cours de désignation, ses coordonnées seront publiées sur cette page';
+  if (text.includes('{tva}') && !val('legal_tva')) return '';
   return text.replaceAll('{editeur}', editeur).replaceAll('{siege}', val('legal_siege')).replaceAll('{etablissement}', s.fullAddress)
     .replaceAll('{tva}', val('legal_tva')).replaceAll('{gerant}', val('legal_manager')).replaceAll('{mediateur}', mediateur)
     .replaceAll('{adresse}', s.fullAddress).replaceAll('{email}', s.email).replaceAll('{contact}', [s.email, s.phone].filter(Boolean).join(' · '));
 };
 for (const [path, page] of Object.entries(LEGAL)) {
-  get(path, (ctx) => sendHtml(ctx.res, legalPage(ctx, { ...page, sections: page.sections.map(([h, ps]) => [h, ps.map(fillLegal)]) })));
+  get(path, (ctx) => sendHtml(ctx.res, legalPage(ctx, { ...page, sections: page.sections.map(([h, ps]) => [h, ps.map(fillLegal).filter(Boolean)]) })));
 }
