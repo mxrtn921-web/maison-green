@@ -142,7 +142,7 @@ export function doc({ title, description = '', body, bodyClass = '', head = '', 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${title ? `${title} — Maison Green` : 'Maison Green — votre épicerie livrée à Rouen'}</title>
-<meta name="description" content="${description || 'Maison Green, épicerie de quartier à Rouen. Fruits et légumes, produits frais, épicerie fine et essentiels du quotidien livrés chez vous, dans le créneau de votre choix.'}">
+<meta name="description" content="${description || 'Maison Green, épicerie de quartier à Rouen : épicerie, cafés, douceurs, vins et CBD livrés chez vous, dans le créneau de votre choix.'}">
 ${robots ? html`<meta name="robots" content="${robots}">` : ''}
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
@@ -155,7 +155,7 @@ ${robots ? html`<meta name="robots" content="${robots}">` : ''}
 <meta property="og:site_name" content="Maison Green">
 <meta property="og:locale" content="fr_FR">
 <meta property="og:title" content="${title ? `${title} — Maison Green` : 'Maison Green — votre épicerie livrée à Rouen'}">
-<meta property="og:description" content="${description || 'Fruits et légumes, produits frais et essentiels du quotidien, livrés chez vous à Rouen dans le créneau de votre choix.'}">
+<meta property="og:description" content="${description || 'Épicerie, cafés, douceurs, vins et CBD livrés chez vous à Rouen, dans le créneau de votre choix.'}">
 <meta property="og:image" content="${config.baseUrl}/img/og-image.png">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">

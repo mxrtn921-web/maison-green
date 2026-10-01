@@ -327,10 +327,10 @@ test('admin : coordonnées de la boutique affichées sur le site et les pages l�
   assert.match((await client().get('/')).text, /href="tel:0235123456"/);
   assert.equal((await client().post('/admin/boutique', { form: { address: 'x' } })).status, 303, 'réservé à l’admin');
   // informations légales saisies dans l'admin → mentions légales et CGV complétées, prénom de l'admin modifié
-  assert.match(legal, /\[à compléter\]/);
+  assert.match(legal, /988 836 037/); // valeurs du Kbis par défaut
   assert.equal((await admin.post('/admin/boutique/legal', { form: { legal_name: 'Maison Green', legal_form: 'SARL', legal_capital: '5000', legal_siren: '123 456 789', legal_rcs: 'Rouen', legal_tva: 'FR12123456789', legal_manager: 'Karim Test', legal_mediator: 'CM2C, www.cm2c.net', first_name: 'Karim', last_name: 'Test' } })).status, 303);
   const legal2 = (await client().get('/mentions-legales')).text;
-  assert.match(legal2, /Maison Green, SARL au capital de 5000 €, immatriculée sous le numéro 123 456 789 \(RCS Rouen\)/);
+  assert.match(legal2, /MOAN, SARL au capital de 5000 €, immatriculée au RCS de Rouen sous le numéro 123 456 789/);
   assert.match(legal2, /FR12123456789/); assert.match(legal2, /Karim Test/);
   assert.doesNotMatch(legal2, /\[à compléter\]/);
   assert.match((await client().get('/cgv')).text, /CM2C, www\.cm2c\.net/);

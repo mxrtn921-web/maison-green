@@ -179,12 +179,20 @@ post('/compte/supprimer', (ctx) => {
 });
 
 // ——— Pages légales ——————————————————————————————————————————
+// Valeurs du Kbis utilisées tant que les champs correspondants ne sont pas remplis dans l'admin.
+const LEGAL_DEFAULTS = {
+  legal_name: 'MOAN', legal_form: 'société par actions simplifiée (SAS)', legal_capital: '200', legal_siren: '988 836 037',
+  legal_rcs: 'Rouen', legal_tva: 'FR94 988 836 037', legal_manager: 'Mourad Djelassi', legal_siege: '27 rue du Général Leclerc, 76000 Rouen',
+  legal_mediator: '',
+};
 const fillLegal = (text) => {
   const s = shopInfo();
-  const todo = (v) => (v && String(v).trim()) || '[à compléter]';
-  const editeur = `${s.legal_name || 'Maison Green'}, ${todo(s.legal_form)}${s.legal_capital ? ` au capital de ${s.legal_capital} €` : ''}, immatriculée sous le numéro ${todo(s.legal_siren)}${s.legal_rcs ? ` (RCS ${s.legal_rcs})` : ''}, dont le siège est situé ${s.fullAddress}.`;
-  return text.replaceAll('{editeur}', editeur).replaceAll('{tva}', s.legal_tva || 'non applicable (article 293 B du CGI) ou à compléter')
-    .replaceAll('{gerant}', todo(s.legal_manager)).replaceAll('{mediateur}', todo(s.legal_mediator))
+  const val = (k) => (s[k] && String(s[k]).trim()) || LEGAL_DEFAULTS[k] || '';
+  const raison = val('legal_name') === 'Maison Green' ? LEGAL_DEFAULTS.legal_name : val('legal_name');
+  const editeur = `${raison}, ${val('legal_form')}${val('legal_capital') ? ` au capital de ${val('legal_capital')} €` : ''}, immatriculée au RCS de ${val('legal_rcs')} sous le numéro ${val('legal_siren')}, exploitant l’enseigne Maison Green, dont le siège social est situé ${val('legal_siege')}.`;
+  const mediateur = val('legal_mediator') || 'médiateur en cours de désignation, ses coordonnées seront publiées sur cette page';
+  return text.replaceAll('{editeur}', editeur).replaceAll('{siege}', val('legal_siege')).replaceAll('{etablissement}', s.fullAddress)
+    .replaceAll('{tva}', val('legal_tva')).replaceAll('{gerant}', val('legal_manager')).replaceAll('{mediateur}', mediateur)
     .replaceAll('{adresse}', s.fullAddress).replaceAll('{email}', s.email).replaceAll('{contact}', [s.email, s.phone].filter(Boolean).join(' · '));
 };
 for (const [path, page] of Object.entries(LEGAL)) {
