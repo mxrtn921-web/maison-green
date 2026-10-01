@@ -73,7 +73,7 @@ const checkoutSchema = {
 };
 
 /**
- * Crée une commande. Tout est revérifié ici : prix, stock, zone, minimum, créneau.
+ * Crée une commande. Tout est revérifié ici : prix, stock, zone, créneau.
  * Renvoie { order } ou lève une HttpError(422) avec des messages par champ.
  */
 export function createOrder(input, user) {
@@ -91,9 +91,6 @@ export function createOrder(input, user) {
 
   const zone = zoneForPostal(data.postal_code);
   if (!errors.postal_code && !zone) errors.postal_code = 'Nous ne livrons pas encore ce code postal. Consultez nos zones de livraison.';
-  if (zone && quote.subtotal < zone.min_order_cents) {
-    errors.cart = `Le minimum de commande pour ${zone.name} est de ${money(zone.min_order_cents)} (il manque ${money(zone.min_order_cents - quote.subtotal)}).`;
-  }
 
   const [slotDate, slotStart] = String(data.slot || '').split('|');
   const slot = slotDate && slotStart ? findSlot(slotDate, slotStart) : null;

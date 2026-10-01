@@ -8,7 +8,7 @@ const json = (v) => raw(JSON.stringify(v).replace(/</g, '\\u003c'));
 export function checkoutPage(ctx, { days, zones, addresses, state }) {
   const u = ctx.user && ctx.user.role === 'customer' ? ctx.user : null;
   const def = addresses.find((a) => a.is_default) || addresses[0] || {};
-  const zoneData = zones.map((z) => ({ name: z.name, codes: z.postal_codes.split(/[\s,;]+/), fee: z.fee_cents, min: z.min_order_cents, free: z.free_over_cents, eta: z.eta_minutes }));
+  const zoneData = zones.map((z) => ({ name: z.name, codes: z.postal_codes.split(/[\s,;]+/), fee: z.fee_cents, min: 0, free: z.free_over_cents, eta: z.eta_minutes }));
 
   const body = html`
 <div class="wrap">

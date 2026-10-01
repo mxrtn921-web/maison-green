@@ -75,7 +75,7 @@ export function homePage(ctx, { categories, featured, zones, hours, state, shelf
         ${zones.map((z) => html`<div class="zone-row">
           <span class="zone-name">${z.name}</span><span class="zone-fee">${z.fee_cents ? money(z.fee_cents) : 'Offerte'}</span>
           <span class="zone-codes">${z.postal_codes.split(',').map((s) => s.trim()).join(' · ')}</span>
-          <span class="zone-min">Minimum ${money(z.min_order_cents)}${z.free_over_cents ? ` · offerte dès ${money(z.free_over_cents)}` : ''}</span>
+          <span class="zone-min">Sans minimum de commande${z.free_over_cents ? ` · offerte dès ${money(z.free_over_cents)}` : ''}</span>
         </div>`)}
       </div>
     </div>

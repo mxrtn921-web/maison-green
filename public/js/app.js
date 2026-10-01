@@ -300,7 +300,7 @@
     if (!/^\d{5}$/.test(cp)) { out.innerHTML = '<span style="color:var(--danger)">Indiquez un code postal à 5 chiffres.</span>'; return; }
     const { data } = await api(`/api/zone?cp=${cp}`);
     out.innerHTML = data.ok
-      ? `<span style="color:var(--green-2)">Oui, nous livrons au ${cp} (${esc(data.name)}).</span> Livraison ${esc(data.fee_label)}, minimum ${esc(data.min_label)}.`
+      ? `<span style="color:var(--green-2)">Oui, nous livrons au ${cp} (${esc(data.name)}).</span> Livraison ${esc(data.fee_label)}, sans minimum de commande.`
       : `<span style="color:var(--danger)">Pas encore de livraison au ${cp}.</span> Écrivez-nous : nous étendons nos zones selon la demande.`;
   });
 
@@ -352,7 +352,7 @@
       const cp = postal.value.trim();
       const z = data.zones.find((x) => x.codes.includes(cp));
       if (cp.length < 5) { hint.textContent = ''; hint.className = 'zone-hint'; }
-      else if (z) { hint.textContent = `${z.name} · livraison ${z.fee ? money(z.fee) : 'offerte'}, minimum ${money(z.min)}`; hint.className = 'zone-hint ok'; }
+      else if (z) { hint.textContent = `${z.name} · livraison ${z.fee ? money(z.fee) : 'offerte'}`; hint.className = 'zone-hint ok'; }
       else { hint.textContent = 'Nous ne livrons pas encore ce code postal.'; hint.className = 'zone-hint ko'; }
       refreshQuote();
     };

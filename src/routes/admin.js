@@ -363,7 +363,7 @@ post('/admin/categories/:id/supprimer', (ctx) => {
 
 const zoneSchema = {
   name: v.text({ label: 'Le nom', max: 80 }), postal_codes: v.text({ label: 'Les codes postaux', max: 400 }),
-  fee: v.money({ label: 'Les frais' }), min_order: v.money({ label: 'Le minimum' }), free_over: v.money({ label: 'Le seuil', required: false }),
+  fee: v.money({ label: 'Les frais' }), free_over: v.money({ label: 'Le seuil', required: false }),
   eta_minutes: v.int({ label: 'Le délai', min: 5, max: 600 }), is_active: v.bool(),
 };
 function zoneData(ctx, id = 0) {
@@ -380,7 +380,7 @@ post('/admin/zones', (ctx) => {
   const { data, errors } = zoneData(ctx);
   if (Object.keys(errors).length) return sendHtml(ctx.res, V.zonesPage(ctx, { zones: all('SELECT * FROM delivery_zones ORDER BY position, id'), errors: { form: Object.values(errors).join(' ') } }), 422);
   run('INSERT INTO delivery_zones (name, postal_codes, fee_cents, min_order_cents, free_over_cents, eta_minutes, position) VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position),0)+1 FROM delivery_zones))',
-    data.name, data.postal_codes, data.fee, data.min_order, data.free_over || null, data.eta_minutes);
+    data.name, data.postal_codes, data.fee, 0, data.free_over || null, data.eta_minutes);
   setFlash(ctx.res, 'success', 'Zone ajoutée.');
   redirect(ctx.res, '/admin/zones');
 });
@@ -390,7 +390,7 @@ post('/admin/zones/:id', (ctx) => {
   const { data, errors } = zoneData(ctx, id);
   if (Object.keys(errors).length) return sendHtml(ctx.res, V.zonesPage(ctx, { zones: all('SELECT * FROM delivery_zones ORDER BY position, id'), errors: { form: Object.values(errors).join(' ') } }), 422);
   run('UPDATE delivery_zones SET name = ?, postal_codes = ?, fee_cents = ?, min_order_cents = ?, free_over_cents = ?, eta_minutes = ?, is_active = ? WHERE id = ?',
-    data.name, data.postal_codes, data.fee, data.min_order, data.free_over || null, data.eta_minutes, data.is_active ? 1 : 0, id);
+    data.name, data.postal_codes, data.fee, 0, data.free_over || null, data.eta_minutes, data.is_active ? 1 : 0, id);
   setFlash(ctx.res, 'success', 'Zone enregistrée.');
   redirect(ctx.res, '/admin/zones');
 });

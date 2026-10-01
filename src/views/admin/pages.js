@@ -359,11 +359,10 @@ export function zonesPage(ctx, { zones, errors = {} }) {
     <div class="field" style="flex:2 1 180px"><label>Nom</label><input class="input" name="name" value="${z.name || ''}" placeholder="Rouen centre" required></div>
     <div class="field" style="flex:3 1 240px"><label>Codes postaux</label><input class="input" name="postal_codes" value="${z.postal_codes || ''}" placeholder="76000, 76100"></div>
     <div class="field" style="flex:1 1 100px"><label>Frais (€)</label><input class="input" name="fee" inputmode="decimal" value="${z.fee_cents !== undefined ? centsToInput(z.fee_cents) : ''}" placeholder="2,99"></div>
-    <div class="field" style="flex:1 1 100px"><label>Minimum (€)</label><input class="input" name="min_order" inputmode="decimal" value="${z.min_order_cents !== undefined ? centsToInput(z.min_order_cents) : ''}" placeholder="15"></div>
     <div class="field" style="flex:1 1 110px"><label>Offerte dès (€)</label><input class="input" name="free_over" inputmode="decimal" value="${z.free_over_cents ? centsToInput(z.free_over_cents) : ''}" placeholder="—"></div>
     <div class="field" style="flex:1 1 90px"><label>Délai (min)</label><input class="input" name="eta_minutes" type="number" min="5" value="${z.eta_minutes ?? 45}"></div>`;
   const body = html`
-  <div class="pro-head"><div><h1 class="h1">Zones de livraison</h1><p>Le code postal saisi par le client détermine la zone, les frais et le minimum de commande.</p></div></div>
+  <div class="pro-head"><div><h1 class="h1">Zones de livraison</h1><p>Le code postal saisi par le client détermine la zone et les frais de livraison. Il n'y a pas de minimum de commande.</p></div></div>
   ${errors.form ? html`<div class="notice notice-error" style="margin-bottom:16px">${icon('alert')}<span>${errors.form}</span></div>` : ''}
   ${zones.map((z) => html`<section class="panel"><form class="panel-body inline-form" style="align-items:flex-end" method="post" action="/admin/zones/${z.id}">
     ${fields(z)}

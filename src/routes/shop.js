@@ -81,15 +81,15 @@ post('/api/cart/quote', (ctx) => {
   const zs = zones();
   sendJson(ctx.res, {
     ...quote,
-    zone: zone ? { name: zone.name, fee: deliveryFee(zone, quote.subtotal), min: zone.min_order_cents, free_over: zone.free_over_cents } : null,
+    zone: zone ? { name: zone.name, fee: deliveryFee(zone, quote.subtotal), min: 0, free_over: zone.free_over_cents } : null,
     min_fee: zs.length ? Math.min(...zs.map((z) => z.fee_cents)) : 0,
-    min_order: zs.length ? Math.min(...zs.map((z) => z.min_order_cents)) : 0,
+    min_order: 0,
   });
 });
 
 get('/api/zone', (ctx) => {
   const z = zoneForPostal(ctx.query.get('cp'));
-  sendJson(ctx.res, z ? { ok: true, name: z.name, fee: z.fee_cents, fee_label: z.fee_cents ? money(z.fee_cents) : 'offerte', min: z.min_order_cents, min_label: money(z.min_order_cents), eta: z.eta_minutes, free_over: z.free_over_cents }
+  sendJson(ctx.res, z ? { ok: true, name: z.name, fee: z.fee_cents, fee_label: z.fee_cents ? money(z.fee_cents) : 'offerte', min: 0, eta: z.eta_minutes, free_over: z.free_over_cents }
     : { ok: false });
 });
 

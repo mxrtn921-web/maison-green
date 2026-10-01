@@ -18,6 +18,8 @@ for (const [table, col, def] of [['push_subscriptions', 'p256dh', "TEXT NOT NULL
   ['orders', 'age_check', 'INTEGER NOT NULL DEFAULT 0']]) {
   if (!hasColumn(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
 }
+// Plus de minimum de commande : toutes les zones acceptent n'importe quel montant.
+db.exec('UPDATE delivery_zones SET min_order_cents = 0 WHERE min_order_cents != 0');
 
 const cache = new Map();
 function stmt(sql) {
