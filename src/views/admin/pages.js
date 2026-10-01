@@ -243,6 +243,7 @@ export function importPage(ctx, { count, errors = [], warnings = [], preview = n
     <p>Un tableau Excel, Numbers ou Google Sheets enregistré au format <strong>CSV</strong>, avec une ligne de titres puis un produit par ligne :</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>Colonne</th><th>Exemple</th><th></th></tr></thead><tbody>
       <tr><td class="strong">nom</td><td>Pommes Belchard</td><td class="small muted">obligatoire</td></tr>
+      <tr><td class="strong">ancien_nom</td><td>JNR — Cherry Berry</td><td class="small muted">facultatif, pour renommer une fiche existante en gardant sa photo et son stock</td></tr>
       <tr><td class="strong">rayon</td><td>Fruits & légumes</td><td class="small muted">obligatoire · reprenez le nom exact d'un rayon (voir Catégories), sinon il est créé</td></tr>
       <tr><td class="strong">prix</td><td>3,40</td><td class="small muted">obligatoire · en euros TTC</td></tr>
       <tr><td class="strong">format</td><td>1 kg · 250 g · pièce · lot de 6</td><td class="small muted">« pièce » si vide</td></tr>
@@ -256,7 +257,7 @@ export function importPage(ctx, { count, errors = [], warnings = [], preview = n
   <section class="panel"><div class="panel-head"><h2>2. Envoyer le fichier</h2></div><div class="panel-body">
     <form method="post" action="/admin/produits/import" enctype="multipart/form-data">
       <div class="field"><label class="label" for="fichier">Fichier CSV</label><input class="input" id="fichier" name="fichier" type="file" accept=".csv,text/csv" required></div>
-      <div class="field mt-16"><label class="check"><input type="radio" name="mode" value="maj" checked> <span><strong>Ajouter et mettre à jour</strong> : les produits déjà en ligne (même nom) sont mis à jour et gardent leur photo, les autres restent.</span></label></div>
+      <div class="field mt-16"><label class="check"><input type="radio" name="mode" value="maj" checked> <span><strong>Ajouter et mettre à jour</strong> : les fiches reconnues par leur nom, ou par « ancien_nom » et leur format, sont mises à jour et gardent leur photo. Les autres restent.</span></label></div>
       <div class="field"><label class="check"><input type="radio" name="mode" value="remplacer"> <span><strong>Remplacer tout le catalogue</strong> : les produits absents du fichier sont retirés (à utiliser pour supprimer les produits d'exemple). Les rayons restent : un rayon vide n'apparaît pas dans la boutique.</span></label></div>
       <button class="btn btn-dark mt-16">Voir l'aperçu</button> <span class="small muted">Rien n'est modifié avant votre confirmation.</span>
     </form>
@@ -268,8 +269,8 @@ export function importPage(ctx, { count, errors = [], warnings = [], preview = n
       <button class="btn btn-primary">${icon('check')} Confirmer l'import</button><a class="btn btn-ghost" href="/admin/produits/import">Annuler</a></form>
   </div>
   <div class="table-wrap"><table class="table"><thead><tr><th>Ligne</th><th>Produit</th><th>Rayon</th><th class="r">Prix</th><th class="r">Stock</th><th>En ligne</th></tr></thead>
-    <tbody>${preview.products.slice(0, 300).map((p) => html`<tr><td class="small muted">${p.line}</td><td><span class="strong">${p.name}</span>${p.is_featured ? html` <span class="badge plain" style="height:20px;font-size:11px">Vedette</span>` : ''}<div class="small muted">${p.unit}${p.origin ? ` · ${p.origin}` : ''}</div></td>
-      <td class="small">${p.category}</td><td class="r strong">${money(p.price)}</td><td class="r">${p.stock}</td><td class="small">${p.is_active ? 'oui' : 'non'}</td></tr>`)}</tbody></table></div></section>`;
+    <tbody>${preview.products.slice(0, 300).map((p) => html`<tr><td class="small muted">${p.line}</td><td><span class="strong">${p.name}</span>${p.is_featured ? html` <span class="badge plain" style="height:20px;font-size:11px">Vedette</span>` : ''}${p.old_name ? html`<div class="small muted">Renomme : ${p.old_name}</div>` : ''}<div class="small muted">${p.unit}${p.origin ? ` · ${p.origin}` : ''}</div></td>
+      <td class="small">${p.category}</td><td class="r strong">${money(p.price)}</td><td class="r">${p.stock === null ? 'conservé' : p.stock}</td><td class="small">${p.is_active === null ? 'conservé' : p.is_active ? 'oui' : 'non'}</td></tr>`)}</tbody></table></div></section>`;
   const body = html`
   <div class="pro-head"><div><a class="small muted" href="/admin/produits" style="text-decoration:none">${icon('back')} Produits</a><h1 class="h1 mt-8">Importer le catalogue</h1>
     <p>Mettez en ligne des dizaines de produits d'un coup à partir d'un tableau. Les photos s'ajoutent ensuite depuis la fiche de chaque produit.</p></div></div>

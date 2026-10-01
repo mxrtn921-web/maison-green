@@ -86,7 +86,7 @@ Copiez `.env.example` en `.env` et remplissez :
 
 ### Importer le vrai catalogue
 
-Admin → Produits → **Importer / exporter** (`/admin/produits/import`) : envoyez un tableau enregistré en CSV (colonnes `nom ; rayon ; prix ; format ; stock ; origine ; description ; vedette ; en_ligne ; max_par_commande`, seuls les trois premiers sont obligatoires). Un aperçu s'affiche avant toute modification. Le mode « Remplacer tout le catalogue » retire les produits d'exemple (les rayons vides sont simplement masqués) ; le mode « Ajouter et mettre à jour » reconnaît les produits existants par leur nom et garde leurs photos. Le catalogue actuel s'exporte dans le même format pour être modifié dans Excel puis réimporté.
+Admin → Produits → **Importer / exporter** (`/admin/produits/import`) : envoyez un tableau enregistré en CSV (colonnes `nom ; rayon ; prix ; format ; stock ; origine ; description ; vedette ; en_ligne ; max_par_commande ; ancien_nom`, seuls les trois premiers sont obligatoires). Un aperçu s'affiche avant toute modification. Le mode « Remplacer tout le catalogue » retire les produits d'exemple (les rayons vides sont simplement masqués) ; le mode « Ajouter et mettre à jour » reconnaît les produits existants par leur nom et garde leurs photos. La colonne facultative `ancien_nom` permet de renommer une fiche existante sans perdre sa photo. Le catalogue actuel s'exporte dans le même format pour être modifié dans Excel puis réimporté.
 
 ### Alertes sur téléphone (livreurs et boutique)
 

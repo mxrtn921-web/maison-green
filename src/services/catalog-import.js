@@ -3,7 +3,7 @@
 import { one, all, run, tx, nowIso } from '../db.js';
 import { v, slugify } from '../lib/validate.js';
 
-export const COLUMNS = ['nom', 'rayon', 'prix', 'format', 'stock', 'origine', 'description', 'vedette', 'en_ligne', 'max_par_commande'];
+export const COLUMNS = ['nom', 'rayon', 'prix', 'format', 'stock', 'origine', 'description', 'vedette', 'en_ligne', 'max_par_commande', 'ancien_nom'];
 const REQUIRED = ['nom', 'rayon', 'prix'];
 const TONES = ['sage', 'sky', 'sand', 'blush', 'butter', 'stone'];
 
@@ -19,6 +19,7 @@ const ALIASES = {
   vedette: ['vedette', 'mis en avant', 'mise en avant', 'coup de coeur'],
   en_ligne: ['en ligne', 'en_ligne', 'visible', 'actif', 'disponible'],
   max_par_commande: ['max par commande', 'max_par_commande', 'maximum', 'max'],
+  ancien_nom: ['ancien nom', 'ancien_nom', 'nom actuel', 'nom existant'],
 };
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[_\s]+/g, ' ').trim();
 
@@ -69,21 +70,25 @@ export function analyse(buf) {
     const get = (c) => (idx[c] === -1 ? '' : String(r[idx[c]] ?? '').trim());
     const e = [];
     const [name, eName] = v.text({ label: 'Le nom', min: 2, max: 120 })(get('nom'));
+    const [oldName, eOldName] = v.text({ label: "L'ancien nom", max: 120, required: false })(get('ancien_nom'));
     const [category, eCat] = v.text({ label: 'Le rayon', max: 60 })(get('rayon'));
     const [price, ePrice] = v.money()(get('prix'));
     const [unit, eUnit] = v.text({ label: 'Le format', max: 40, required: false })(get('format'));
-    const [stock, eStock] = v.int({ label: 'Le stock', max: 99999, required: false })(get('stock').replace(/\s/g, ''));
+    const [stockValue, eStock] = v.int({ label: 'Le stock', max: 99999, required: false })(get('stock').replace(/\s/g, ''));
     const [maxPer, eMax] = v.int({ label: 'Le maximum par commande', min: 1, max: 999, required: false })(get('max_par_commande'));
-    const [origin, eOrig] = v.text({ label: "L'origine", max: 80, required: false })(get('origine'));
-    const [description, eDesc] = v.longText({ label: 'La description', max: 1500 })(get('description'));
-    for (const x of [eName, eCat, ePrice, eUnit, eStock, eMax, eOrig, eDesc]) if (x) e.push(x);
+    const [originValue, eOrig] = v.text({ label: "L'origine", max: 80, required: false })(get('origine'));
+    const [descriptionValue, eDesc] = v.longText({ label: 'La description', max: 1500 })(get('description'));
+    for (const x of [eName, eOldName, eCat, ePrice, eUnit, eStock, eMax, eOrig, eDesc]) if (x) e.push(x);
     if (e.length) { errors.push(`Ligne ${line}${name ? ` (${name})` : ''} : ${e.join(' ')}`); return; }
     const key = norm(name) + '|' + norm(unit);
     if (seen.has(key)) { errors.push(`Ligne ${line} : « ${name} »${unit ? ` (${unit})` : ''} apparaît déjà ligne ${seen.get(key)}.`); return; }
     seen.set(key, line);
-    if (stock === null) warnings.push(`Ligne ${line} (${name}) : stock non renseigné, mis à 0 (produit affiché « épuisé »).`);
-    products.push({ line, name, category, price, unit: unit || 'pièce', stock: stock ?? 0, max_per_order: maxPer ?? 20, origin, description,
-      is_featured: yes(get('vedette'), false), is_active: yes(get('en_ligne'), true) });
+    if (stockValue === null && !oldName) warnings.push(`Ligne ${line} (${name}) : stock non renseigné, mis à 0 (produit affiché « épuisé »).`);
+    products.push({ line, name, old_name: oldName, category, price, unit: unit || 'pièce',
+      stock: stockValue === null && oldName ? null : stockValue ?? 0,
+      max_per_order: maxPer === null && oldName ? null : maxPer ?? 20,
+      origin: !originValue && oldName ? null : originValue, description: !descriptionValue && oldName ? null : descriptionValue,
+      is_featured: yes(get('vedette'), oldName ? null : false), is_active: yes(get('en_ligne'), oldName ? null : true) });
   });
   if (!products.length && !errors.length) errors.push('Aucun produit trouvé sous la ligne de titres.');
   return { products, errors, warnings };
@@ -118,22 +123,26 @@ export function apply(products, { mode = 'maj' } = {}) {
       run('UPDATE categories SET is_active = 1 WHERE id = ?', id);
       return id;
     };
-    const existing = all('SELECT id, name, unit, image_url FROM products WHERE deleted_at IS NULL');
+    const existing = all('SELECT id, name, unit, image_url, slug, description, origin, stock, max_per_order, is_active, is_featured FROM products WHERE deleted_at IS NULL');
     const byKey = new Map(existing.map((p) => [norm(p.name) + '|' + norm(p.unit), p]));
     const byName = new Map(); for (const p of existing) { const k = norm(p.name); byName.set(k, byName.has(k) ? null : p); }
     const kept = new Set();
     for (const p of products) {
       const cid = catId(p.category);
-      const found = byKey.get(norm(p.name) + '|' + norm(p.unit)) || byName.get(norm(p.name));
+      const oldKey = norm(p.old_name);
+      const found = byKey.get(norm(p.name) + '|' + norm(p.unit)) || byName.get(norm(p.name))
+        || (oldKey ? byKey.get(oldKey + '|' + norm(p.unit)) || byName.get(oldKey) : null);
       if (found && !kept.has(found.id)) {
-        run(`UPDATE products SET category_id = ?, name = ?, description = ?, origin = ?, price_cents = ?, unit = ?, stock = ?, max_per_order = ?,
-             is_active = ?, is_featured = ?, updated_at = ? WHERE id = ?`, cid, p.name, p.description, p.origin, p.price, p.unit, p.stock, p.max_per_order,
-        p.is_active ? 1 : 0, p.is_featured ? 1 : 0, nowIso(), found.id);
+        const slug = norm(found.name) === norm(p.name) ? found.slug : uniqueSlug(p.name, found.id);
+        run(`UPDATE products SET category_id = ?, name = ?, slug = ?, description = ?, origin = ?, price_cents = ?, unit = ?, stock = ?, max_per_order = ?,
+             is_active = ?, is_featured = ?, updated_at = ? WHERE id = ?`, cid, p.name, slug, p.description ?? found.description, p.origin ?? found.origin, p.price, p.unit,
+        p.stock ?? found.stock, p.max_per_order ?? found.max_per_order, p.is_active === null ? found.is_active : (p.is_active ? 1 : 0),
+        p.is_featured === null ? found.is_featured : (p.is_featured ? 1 : 0), nowIso(), found.id);
         kept.add(found.id); stats.updated++;
       } else {
         const r = run(`INSERT INTO products (category_id, name, slug, description, origin, price_cents, unit, stock, max_per_order, is_active, is_featured)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, cid, p.name, uniqueSlug(p.name), p.description, p.origin, p.price, p.unit, p.stock, p.max_per_order,
-        p.is_active ? 1 : 0, p.is_featured ? 1 : 0);
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, cid, p.name, uniqueSlug(p.name), p.description ?? '', p.origin ?? '', p.price, p.unit,
+        p.stock ?? 0, p.max_per_order ?? 20, p.is_active === null ? 1 : (p.is_active ? 1 : 0), p.is_featured === null ? 0 : (p.is_featured ? 1 : 0));
         kept.add(Number(r.lastInsertRowid)); stats.created++;
       }
     }
