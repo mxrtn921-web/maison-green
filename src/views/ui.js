@@ -2,6 +2,7 @@
 import { html, raw, money, esc } from '../lib/html.js';
 import { STATUS, PAYMENT_STATUS } from '../services/orders.js';
 import { config } from '../config.js';
+import { getSetting } from '../db.js';
 
 const P = {
   bag: '<path d="M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 8Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
@@ -156,6 +157,7 @@ export function doc({ title, description = '', body, bodyClass = '', head = '', 
 <title>${title ? `${title} — Maison Green` : 'Maison Green — votre épicerie livrée à Rouen'}</title>
 <meta name="description" content="${description || 'Maison Green, épicerie de quartier à Rouen : épicerie, cafés, douceurs, vins et CBD livrés chez vous, dans le créneau de votre choix.'}">
 ${robots ? html`<meta name="robots" content="${robots}">` : ''}
+${getSetting('google_verification', '') ? html`<meta name="google-site-verification" content="${getSetting('google_verification', '')}">` : ''}
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">

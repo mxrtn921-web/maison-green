@@ -511,6 +511,15 @@ post('/admin/boutique/legal', (ctx) => {
   setFlash(ctx.res, 'success', 'Informations légales enregistrées : les mentions légales et les CGV sont à jour.');
   redirect(ctx.res, '/admin/horaires');
 });
+// Google Search Console : code de validation (balise meta « google-site-verification »).
+post('/admin/boutique/google', (ctx) => {
+  admin(ctx);
+  const raw = String(ctx.body.google_verification || '').trim();
+  const code = (raw.match(/content=["']([^"']+)["']/) || [null, raw])[1].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 100);
+  setSetting('google_verification', code);
+  setFlash(ctx.res, 'success', code ? 'Code Google enregistré : vous pouvez cliquer sur « Valider » dans la Search Console.' : 'Code Google retiré.');
+  redirect(ctx.res, '/admin/horaires');
+});
 post('/admin/horaires/reglages', (ctx) => {
   admin(ctx);
   const [lead, err] = v.int({ label: 'Le délai', max: 1440 })(ctx.body.lead_time_minutes);

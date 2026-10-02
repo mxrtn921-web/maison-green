@@ -11,6 +11,8 @@ const mapsUrl = (o) => `https://www.google.com/maps/search/?api=1&query=${encode
 
 // ——— Tableau de bord ——————————————————————————————————————————
 
+import { getSetting as __gs } from '../../db.js';
+const getSettingSafe = (k) => __gs(k, '') || '';
 export function dashboardPage(ctx, s) {
   const max = Math.max(...s.series.map((d) => d.total), 1);
   const topMax = Math.max(...s.top.map((t) => t.qty), 1);
@@ -455,6 +457,14 @@ export function hoursPage(ctx, { hours, slots, closures, settings, shop, lastBac
         <div class="field"><label for="lg9">Votre prénom (affiché dans l'admin)</label><input class="input" id="lg9" name="first_name" value="${ctx.user.first_name}" required></div>
         <div class="field"><label for="lg10">Votre nom</label><input class="input" id="lg10" name="last_name" value="${ctx.user.last_name || ''}"></div>
       </div>
+      <div><button class="btn btn-dark btn-sm">Enregistrer</button></div>
+    </form>
+  </section>
+
+  <section class="panel"><div class="panel-head"><h2>Référencement Google</h2></div>
+    <form class="panel-body form-grid" method="post" action="/admin/boutique/google">
+      <p class="small muted">Search Console → Ajouter une propriété → <strong>Préfixe de l'URL</strong> → méthode « Balise HTML ». Collez ici la balise (ou seulement le code), enregistrez, puis cliquez sur « Valider » chez Google. Plan du site à déclarer : <a class="link" href="/sitemap.xml" target="_blank">/sitemap.xml</a>.</p>
+      <div class="field"><label for="gsv">Balise de validation Google</label><input class="input" id="gsv" name="google_verification" value="${getSettingSafe('google_verification')}" placeholder='&lt;meta name="google-site-verification" content="…"&gt;'></div>
       <div><button class="btn btn-dark btn-sm">Enregistrer</button></div>
     </form>
   </section>
