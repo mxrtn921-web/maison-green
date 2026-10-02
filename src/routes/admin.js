@@ -257,6 +257,20 @@ function saveImage(file) {
   fs.writeFileSync(path.join(config.uploadsDir, name), b);
   return `/uploads/${name}`;
 }
+
+/** Télécharge une photo depuis une adresse web (https uniquement, 5 Mo max), puis la vérifie comme un envoi classique. */
+async function fetchImage(raw) {
+  let u;
+  try { u = new URL(String(raw || '').trim()); } catch { throw new HttpError(422, 'Adresse invalide', { errors: { image: 'Adresse de photo invalide.' } }); }
+  if (u.protocol !== 'https:' || /^(localhost|\d+\.\d+\.\d+\.\d+|\[.*\])$/i.test(u.hostname) || u.hostname.endsWith('.internal')) {
+    throw new HttpError(422, 'Adresse refusée', { errors: { image: 'Seules les adresses https publiques sont acceptées.' } });
+  }
+  const r = await fetch(u, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'MaisonGreen/1.0 (photos produit)' } });
+  if (!r.ok) throw new HttpError(422, 'Téléchargement impossible', { errors: { image: `Photo introuvable (erreur ${r.status}).` } });
+  const len = Number(r.headers.get('content-length') || 0);
+  if (len > 5 * 1024 * 1024) throw new HttpError(422, 'Image trop lourde', { errors: { image: 'Image trop lourde (5 Mo maximum).' } });
+  return { data: Buffer.from(await r.arrayBuffer()), filename: path.basename(u.pathname) || 'photo' };
+}
 function removeImage(url) {
   if (url && url.startsWith('/uploads/')) fs.rm(path.join(config.uploadsDir, path.basename(url)), () => {});
 }
@@ -290,7 +304,7 @@ get('/admin/produits/:id', (ctx) => {
   if (!p) throw new HttpError(404, 'Produit introuvable');
   sendHtml(ctx.res, V.productFormPage(ctx, { product: p, categories: listCategories({ includeInactive: true }) }));
 });
-post('/admin/produits/:id', (ctx) => {
+post('/admin/produits/:id', async (ctx) => {
   admin(ctx);
   const p = productById(Number(ctx.params.id));
   if (!p) throw new HttpError(404);
@@ -300,7 +314,8 @@ post('/admin/produits/:id', (ctx) => {
   if (!ok) return back(errors);
   let image = p.image_url;
   try {
-    const uploaded = saveImage(ctx.files.image);
+    const webFile = !ctx.files.image && ctx.body.image_web ? await fetchImage(ctx.body.image_web) : null;
+    const uploaded = saveImage(ctx.files.image || webFile);
     if (uploaded) { removeImage(p.image_url); image = uploaded; } else if (ctx.body.remove_image) { removeImage(p.image_url); image = null; }
   } catch (e) { return back(e.errors || { image: e.message }); }
   run(`UPDATE products SET category_id = ?, name = ?, slug = ?, description = ?, origin = ?, price_cents = ?, unit = ?, stock = ?, max_per_order = ?, image_url = ?,
@@ -308,6 +323,19 @@ post('/admin/produits/:id', (ctx) => {
   data.description, data.origin, data.price, data.unit, data.stock, data.max_per_order, image, data.is_active ? 1 : 0, data.is_featured ? 1 : 0, nowIso(), p.id);
   setFlash(ctx.res, 'success', 'Produit enregistré.');
   redirect(ctx.res, `/admin/produits/${p.id}`);
+});
+post('/admin/produits/:id/photo-web', async (ctx) => {
+  admin(ctx);
+  const p = productById(Number(ctx.params.id));
+  if (!p) throw new HttpError(404, 'Produit introuvable');
+  let out;
+  try {
+    const url = saveImage(await fetchImage(ctx.body.url));
+    removeImage(p.image_url);
+    run('UPDATE products SET image_url = ?, updated_at = ? WHERE id = ?', url, nowIso(), p.id);
+    out = { ok: true, image_url: url };
+  } catch (e) { out = { ok: false, error: e.errors?.image || e.message }; }
+  send(ctx.res, out.ok ? 200 : 422, JSON.stringify(out), 'application/json; charset=utf-8');
 });
 post('/admin/produits/:id/stock', (ctx) => {
   admin(ctx);

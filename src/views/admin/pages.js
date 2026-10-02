@@ -306,6 +306,7 @@ export function productFormPage(ctx, { product = {}, categories, errors = {}, is
         <p class="label">Photo</p>
         ${productTag({ ...p, name: p.name || 'Aperçu', category_name: categories.find((c) => c.id === p.category_id)?.name, tone: categories.find((c) => c.id === p.category_id)?.tone })}
         <input class="input" type="file" name="image" accept="image/jpeg,image/png,image/webp" style="min-height:auto">
+        <input class="input mt-8" type="url" name="image_web" placeholder="ou collez l'adresse web d'une photo (https://…)" inputmode="url">
         <p class="small muted">JPEG, PNG ou WebP, 5 Mo maximum. Format carré conseillé. Sans photo, l'étiquette Maison Green s'affiche automatiquement.</p>
         ${fieldErr(errors, 'image')}
         ${p.image_url ? html`<label class="check"><input type="checkbox" name="remove_image"> Retirer la photo actuelle</label>` : ''}
