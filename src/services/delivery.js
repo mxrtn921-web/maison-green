@@ -24,8 +24,13 @@ export const openingHours = () => all('SELECT * FROM opening_hours ORDER BY week
 export function shopOpenNow(now = parisNow()) {
   const h = one('SELECT * FROM opening_hours WHERE weekday = ?', now.weekday);
   const closed = one('SELECT 1 AS x FROM closures WHERE date = ?', now.date);
+  // Fin de soirée de la veille quand celle-ci ferme après minuit (ex. 10:00 → 02:00).
+  const prev = one('SELECT * FROM opening_hours WHERE weekday = ?', (now.weekday + 6) % 7);
+  const prevClosed = one('SELECT 1 AS x FROM closures WHERE date = ?', addDays(now.date, -1));
+  if (prev?.is_open && !prevClosed && toMinutes(prev.closes_at) <= toMinutes(prev.opens_at) && now.minutes < toMinutes(prev.closes_at)) return true;
   if (!h || !h.is_open || closed) return false;
-  return now.minutes >= toMinutes(h.opens_at) && now.minutes < toMinutes(h.closes_at);
+  const o = toMinutes(h.opens_at), c = toMinutes(h.closes_at);
+  return c > o ? now.minutes >= o && now.minutes < c : now.minutes >= o;
 }
 
 const ACTIVE_STATUSES = `status NOT IN ('cancelled')`;

@@ -537,7 +537,8 @@ post('/admin/horaires/ouverture', (ctx) => {
     const [o, e1] = v.time({ label: `L'ouverture du ${WEEKDAYS[wd].toLowerCase()}` })(ctx.body[`opens_${wd}`]);
     const [c, e2] = v.time({ label: `La fermeture du ${WEEKDAYS[wd].toLowerCase()}` })(ctx.body[`closes_${wd}`]);
     if (e1 || e2) return sendHtml(ctx.res, hoursData(ctx, { form: e1 || e2 }), 422);
-    if (o >= c) return sendHtml(ctx.res, hoursData(ctx, { form: `${WEEKDAYS[wd]} : la fermeture doit être après l'ouverture.` }), 422);
+    // Une fermeture plus tôt que l'ouverture signifie « après minuit » (ex. 10:00 → 02:00).
+    if (o === c) return sendHtml(ctx.res, hoursData(ctx, { form: `${WEEKDAYS[wd]} : l'ouverture et la fermeture ne peuvent pas être identiques.` }), 422);
     rows.push([wd, ctx.body[`open_${wd}`] ? 1 : 0, o, c]);
   }
   tx(() => { for (const r of rows) run('INSERT INTO opening_hours (weekday, is_open, opens_at, closes_at) VALUES (?, ?, ?, ?) ON CONFLICT(weekday) DO UPDATE SET is_open = excluded.is_open, opens_at = excluded.opens_at, closes_at = excluded.closes_at', ...r); });
