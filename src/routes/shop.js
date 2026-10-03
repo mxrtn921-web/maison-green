@@ -41,14 +41,17 @@ get('/sitemap.xml', (ctx) => {
 
 get('/', (ctx) => {
   const cats = categories({ withCounts: true }).filter((c) => c.product_count > 0);
-  const featured = groupVariants(featuredProducts(24)).slice(0, 8);
+  // Vitrine de l'accueil : uniquement l'épicerie « grand public » (pas de CBD, alcool, tabac ou vape), photos en priorité.
+  const showcase = (p) => !p.age_restricted && !/cbd|alcool|vin|biere|puff|cigarette|liquide|vape|tabac/i.test(`${p.category_slug} ${p.category_name}`);
+  const featuredAll = featuredProducts(200).filter(showcase);
+  const featured = groupVariants([...featuredAll.filter((p) => p.image_url), ...featuredAll.filter((p) => !p.image_url)]).slice(0, 8);
   // Étagère de l'accueil : un produit par rayon, pour montrer la palette d'étiquettes.
   // Vitrine de l'accueil : un produit par rayon (de préférence avec photo), complétée jusqu'à 6 cases pour garder une grille pleine.
   const pick = (list) => list.find((p) => p.is_featured && p.image_url) || list.find((p) => p.image_url) || list[0];
-  const shelfRaw = cats.slice(0, 6).map((c) => pick(shopProducts({ category: c.slug }))).filter(Boolean);
+  const shelfRaw = cats.filter((c) => showcase({ category_slug: c.slug, category_name: c.name, age_restricted: c.age_restricted })).slice(0, 6).map((c) => pick(shopProducts({ category: c.slug }))).filter(Boolean);
   if (shelfRaw.length < 6) {
     const taken = new Set(shelfRaw.map((p) => p.id));
-    for (const p of shopProducts({}).filter((x) => x.image_url && !taken.has(x.id))) { if (shelfRaw.length >= 6) break; shelfRaw.push(p); }
+    for (const p of shopProducts({}).filter((x) => x.image_url && showcase(x) && !taken.has(x.id))) { if (shelfRaw.length >= 6) break; shelfRaw.push(p); }
   }
   const shelf = shelfRaw.slice(0, 6).map((p) => (p.group_name ? { ...p, name: p.group_name, unit: `${p.variant_count} formats` } : p));
   sendHtml(ctx.res, homePage(ctx, { categories: cats, featured, zones: zones(), hours: hoursSummary(), state: orderingState(), shelf }));
