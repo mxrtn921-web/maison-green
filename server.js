@@ -13,6 +13,7 @@ import './src/routes/shop.js';
 import './src/routes/account.js';
 import './src/routes/admin.js';
 import './src/routes/driver.js';
+import './src/routes/links.js';
 
 const PUBLIC = path.join(ROOT, 'public');
 // Images produits : servies depuis config.uploadsDir (volume persistant en production).
