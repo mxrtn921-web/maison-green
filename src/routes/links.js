@@ -6,13 +6,11 @@ import { hoursSummary, shopOpenNow } from '../services/delivery.js';
 const PLACE_ID = 'ChIJ9c9DrUbf4EcRdV3a8GmDT8s';
 const REVIEW_URL = `https://search.google.com/local/writereview?placeid=${PLACE_ID}`;
 const MAPS_URL = `https://www.google.com/maps/search/?api=1&query=Maison+Green+Rouen&query_place_id=${PLACE_ID}`;
-const PHONE = '+33763730997';
 
 const ICONS = {
   star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   bag: '<path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
   pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
-  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -75,7 +73,6 @@ h1 em{color:var(--g2)}
     ${link('/avis', 'star', 'Laissez-nous un avis Google', 'Une minute pour nous aider, merci !', true, false)}
     ${link('/', 'bag', 'Commander en ligne', 'Livraison à Rouen, 7j/7', false, false)}
     ${link(MAPS_URL, 'pin', 'Venir à la boutique', '42 rue de la République, Rouen')}
-    ${link(`tel:${PHONE}`, 'phone', 'Nous appeler', '07 63 73 09 97', false, false)}
   </nav>
   <p class="addr">© Maison Green · <a href="/mentions-legales">Mentions légales</a></p>
 </main></body></html>`;
