@@ -420,7 +420,7 @@ export function hoursPage(ctx, { hours, slots, closures, settings, shop, lastBac
           <form method="post" action="/admin/creneaux/${s.id}/supprimer" style="display:inline"><button title="Supprimer" aria-label="Supprimer le créneau">${icon('x')}</button></form></span>`) : html`<span class="small muted">Aucun créneau</span>`}
       </div></div>`)}
       <form class="inline-form mt-24" method="post" action="/admin/creneaux" style="align-items:flex-end">
-        <div class="field" style="flex:1 1 140px"><label>Jour</label><select class="select" name="weekday"><option value="all">Du lundi au samedi</option>${order.map((wd) => html`<option value="${wd}">${WEEKDAYS[wd]}</option>`)}</select></div>
+        <div class="field" style="flex:1 1 140px"><label>Jour</label><select class="select" name="weekday"><option value="every">Tous les jours</option><option value="all">Du lundi au samedi</option>${order.map((wd) => html`<option value="${wd}">${WEEKDAYS[wd]}</option>`)}</select></div>
         <div class="field" style="flex:1 1 110px"><label>Début</label><input class="input" type="time" name="starts_at" value="13:00"></div>
         <div class="field" style="flex:1 1 110px"><label>Fin</label><input class="input" type="time" name="ends_at" value="14:00"></div>
         <div class="field" style="flex:1 1 90px"><label>Capacité</label><input class="input" type="number" name="capacity" min="1" max="200" value="6"></div>

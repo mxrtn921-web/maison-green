@@ -548,8 +548,8 @@ post('/admin/horaires/ouverture', (ctx) => {
 post('/admin/creneaux', (ctx) => {
   admin(ctx);
   const { data, errors, ok } = validate({ starts_at: v.time({ label: 'Le début' }), ends_at: v.time({ label: 'La fin' }), capacity: v.int({ label: 'La capacité', min: 1, max: 200 }) }, ctx.body);
-  if (!ok || data.starts_at >= data.ends_at) return sendHtml(ctx.res, hoursData(ctx, { form: Object.values(errors)[0] || 'La fin du créneau doit être après son début.' }), 422);
-  const days = ctx.body.weekday === 'all' ? [1, 2, 3, 4, 5, 6] : [Number(ctx.body.weekday)].filter((d) => d >= 0 && d <= 6);
+  if (!ok || (data.starts_at >= data.ends_at && data.ends_at !== '00:00')) return sendHtml(ctx.res, hoursData(ctx, { form: Object.values(errors)[0] || 'La fin du créneau doit être après son début.' }), 422);
+  const days = ctx.body.weekday === 'every' ? [0, 1, 2, 3, 4, 5, 6] : ctx.body.weekday === 'all' ? [1, 2, 3, 4, 5, 6] : [Number(ctx.body.weekday)].filter((d) => d >= 0 && d <= 6);
   tx(() => { for (const d of days) if (!one('SELECT 1 AS x FROM delivery_slots WHERE weekday = ? AND starts_at = ?', d, data.starts_at)) run('INSERT INTO delivery_slots (weekday, starts_at, ends_at, capacity) VALUES (?, ?, ?, ?)', d, data.starts_at, data.ends_at, data.capacity); });
   setFlash(ctx.res, 'success', 'Créneau ajouté.');
   redirect(ctx.res, '/admin/horaires');
