@@ -61,13 +61,21 @@ export function availableSlots(days = 7, now = parisNow()) {
   const ywd = weekdayOf(yesterday);
   const carry = (closures.has(yesterday) || !hours[ywd]?.is_open) ? []
     : slotsOf(ywd).filter((s) => slotEndMinutes(s) > 1440 && now.minutes + lead <= slotEndMinutes(s) - 1440).map((s) => make(yesterday, s));
+  // Les créneaux de 0h à l'ouverture (ex. 00h – 01h, 01h – 02h) font partie de la soirée de la veille :
+  // à 23h, « 00h – 01h » est proposé dans « Aujourd'hui » (c'est cette nuit), pas dans « Demain ».
+  const isOpen = (date) => !closures.has(date) && hours[weekdayOf(date)]?.is_open;
+  const isNight = (date, s) => toMinutes(s.starts_at) < toMinutes(hours[weekdayOf(date)]?.opens_at || '00:00');
   for (let i = 0; i < days; i++) {
     const date = addDays(now.date, i);
     const wd = weekdayOf(date);
-    const open = !closures.has(date) && hours[wd]?.is_open;
-    const slots = [...(i === 0 ? carry : []), ...(open ? slotsOf(wd)
-      .filter((s) => i > 0 || now.minutes + lead <= slotEndMinutes(s))
-      .map((s) => make(date, s)) : [])];
+    const next = addDays(date, 1);
+    const own = isOpen(date) ? slotsOf(wd).filter((s) => (i === 0 || !isNight(date, s)) && (i > 0 || now.minutes + lead <= slotEndMinutes(s))) : [];
+    const tonight = isOpen(date) && isOpen(next) ? slotsOf(weekdayOf(next)).filter((s) => isNight(next, s)) : [];
+    const slots = [
+      ...(i === 0 ? carry : []),
+      ...own.map((s) => make(date, s)),
+      ...tonight.map((s) => make(next, s)),
+    ];
     if (slots.length) out.push({ date, label: dayLabel(date, now.date), slots });
   }
   return out;
