@@ -35,31 +35,49 @@ export function shopOpenNow(now = parisNow()) {
 
 const ACTIVE_STATUSES = `status NOT IN ('cancelled')`;
 
-/** Créneaux disponibles sur les N prochains jours. */
+/** Fin d'un créneau en minutes depuis le début de son jour (un créneau qui finit après minuit dépasse 1440). */
+const slotEndMinutes = (s) => { const a = toMinutes(s.starts_at), b = toMinutes(s.ends_at); return b > a ? b : b + 1440; };
+
+/**
+ * Créneaux disponibles sur les N prochains jours.
+ * Un créneau reste réservable tant qu'il reste au moins le délai de préparation avant sa fin :
+ * à 23h, le créneau 23h – 2h est proposé tout de suite (livraison dans l'heure).
+ * Après minuit, le créneau de la veille qui court encore (ex. 23h – 2h) est proposé dans « Aujourd'hui ».
+ */
 export function availableSlots(days = 7, now = parisNow()) {
   const lead = Number(getSetting('lead_time_minutes', 45));
   const closures = new Set(all('SELECT date FROM closures').map((c) => c.date));
   const hours = Object.fromEntries(openingHours().map((h) => [h.weekday, h]));
   const counts = new Map(all(`SELECT slot_date || ' ' || slot_start AS k, COUNT(*) AS n FROM orders
-                              WHERE slot_date >= ? AND ${ACTIVE_STATUSES} GROUP BY k`, now.date).map((r) => [r.k, r.n]));
+                              WHERE slot_date >= ? AND ${ACTIVE_STATUSES} GROUP BY k`, addDays(now.date, -1)).map((r) => [r.k, r.n]));
+  const make = (date, s) => {
+    const used = counts.get(`${date} ${s.starts_at}`) || 0;
+    return { date, start: s.starts_at, end: s.ends_at, remaining: Math.max(0, s.capacity - used), label: `${hLabel(s.starts_at)} – ${hLabel(s.ends_at)}` };
+  };
+  const slotsOf = (wd) => all('SELECT * FROM delivery_slots WHERE weekday = ? AND is_active = 1 ORDER BY starts_at', wd);
   const out = [];
+  // Créneaux de la veille qui débordent après minuit et ne sont pas encore terminés.
+  const yesterday = addDays(now.date, -1);
+  const ywd = weekdayOf(yesterday);
+  const carry = (closures.has(yesterday) || !hours[ywd]?.is_open) ? []
+    : slotsOf(ywd).filter((s) => slotEndMinutes(s) > 1440 && now.minutes + lead <= slotEndMinutes(s) - 1440).map((s) => make(yesterday, s));
   for (let i = 0; i < days; i++) {
     const date = addDays(now.date, i);
     const wd = weekdayOf(date);
-    if (closures.has(date) || !hours[wd]?.is_open) continue;
-    const slots = all('SELECT * FROM delivery_slots WHERE weekday = ? AND is_active = 1 ORDER BY starts_at', wd)
-      .filter((s) => i > 0 || toMinutes(s.starts_at) >= now.minutes + lead)
-      .map((s) => {
-        const used = counts.get(`${date} ${s.starts_at}`) || 0;
-        return { date, start: s.starts_at, end: s.ends_at, remaining: Math.max(0, s.capacity - used), label: `${hLabel(s.starts_at)} – ${hLabel(s.ends_at)}` };
-      });
+    const open = !closures.has(date) && hours[wd]?.is_open;
+    const slots = [...(i === 0 ? carry : []), ...(open ? slotsOf(wd)
+      .filter((s) => i > 0 || now.minutes + lead <= slotEndMinutes(s))
+      .map((s) => make(date, s)) : [])];
     if (slots.length) out.push({ date, label: dayLabel(date, now.date), slots });
   }
   return out;
 }
 
 export function findSlot(date, start) {
-  for (const d of availableSlots(8)) if (d.date === date) return d.slots.find((s) => s.start === start && s.remaining > 0) || null;
+  for (const d of availableSlots(8)) {
+    const s = d.slots.find((x) => x.date === date && x.start === start);
+    if (s) return s.remaining > 0 ? s : null;
+  }
   return null;
 }
 
@@ -72,7 +90,7 @@ export const NO_DRIVER_MESSAGE = "Aucun livreur n'est disponible pour le moment 
 export function orderingState() {
   const paused = getSetting('orders_paused', false);
   const days = availableSlots();
-  const first = days.flatMap((d) => d.slots.filter((s) => s.remaining > 0).map((s) => ({ ...s, dayLabel: d.label })))[0] || null;
+  const first = days.flatMap((d) => d.slots.filter((s) => s.remaining > 0).map((s) => ({ ...s, dayLabel: d.label, dayDate: d.date })))[0] || null;
   const now = parisNow();
   const open = shopOpenNow(now);
   const drivers = availableDrivers();
@@ -80,8 +98,8 @@ export function orderingState() {
   if (paused) message = getSetting('pause_message', 'Les commandes sont momentanément suspendues. Revenez très vite.');
   else if (!drivers) message = NO_DRIVER_MESSAGE;
   else if (!first) message = "Aucun créneau de livraison n'est disponible pour le moment.";
-  else if (first.date !== now.date) message = `Livraisons terminées pour aujourd'hui. Prochain créneau : ${first.dayLabel.toLowerCase()}, ${first.label}.`;
-  return { accepting: !paused && drivers > 0 && Boolean(first), open, nextSlot: first, message, isToday: first?.date === now.date };
+  else if (first.dayDate !== now.date) message = `Livraisons terminées pour aujourd'hui. Prochain créneau : ${first.dayLabel.toLowerCase()}, ${first.label}.`;
+  return { accepting: !paused && drivers > 0 && Boolean(first), open, nextSlot: first, message, isToday: first?.dayDate === now.date };
 }
 
 export function hoursSummary() {

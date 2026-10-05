@@ -54,7 +54,7 @@ export function checkoutPage(ctx, { days, zones, addresses, state }) {
           ${days.map((d, i) => html`<button type="button" class="day-btn" data-day="${d.date}" aria-pressed="${i === 0}"><span class="d">${d.label}</span><span class="s">${d.slots.filter((s) => s.remaining > 0).length} créneau${d.slots.filter((s) => s.remaining > 0).length > 1 ? 'x' : ''}</span></button>`)}
         </div>
         ${days.map((d, i) => html`<div class="slots" data-slots-for="${d.date}" ${raw(i === 0 ? '' : 'hidden')} role="radiogroup" aria-label="Créneaux du ${d.label}">
-          ${d.slots.map((s) => html`<div class="slot"><input type="radio" name="slot" id="slot-${d.date}-${s.start}" value="${d.date}|${s.start}" ${raw(s.remaining ? '' : 'disabled')}><label for="slot-${d.date}-${s.start}"><span class="t">${s.label}</span><span class="r">${s.remaining ? (s.remaining <= 2 ? `Plus que ${s.remaining} place${s.remaining > 1 ? 's' : ''}` : 'Disponible') : 'Complet'}</span></label></div>`)}
+          ${d.slots.map((s) => html`<div class="slot"><input type="radio" name="slot" id="slot-${s.date}-${s.start}" value="${s.date}|${s.start}" ${raw(s.remaining ? '' : 'disabled')}><label for="slot-${s.date}-${s.start}"><span class="t">${s.label}</span><span class="r">${s.remaining ? (s.remaining <= 2 ? `Plus que ${s.remaining} place${s.remaining > 1 ? 's' : ''}` : 'Disponible') : 'Complet'}</span></label></div>`)}
         </div>`)}` : html`<div class="notice notice-warn">${icon('info')}<span>Aucun créneau disponible pour le moment.</span></div>`}
         <p class="error-text mt-8" data-err="slot" hidden></p>
       </section>

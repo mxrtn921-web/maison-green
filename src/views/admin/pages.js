@@ -186,6 +186,16 @@ export function orderDetailPage(ctx, { order: o, items, events, drivers, payment
         <p class="mt-8">${o.address_line1}${o.address_line2 ? html`<br>${o.address_line2}` : ''}<br>${o.postal_code} ${o.city}</p>
         ${o.instructions ? html`<div class="instr mt-8"><strong>Instructions</strong>${o.instructions}</div>` : ''}
         <p class="mt-8 small">${icon('clock')} ${slotLabel(o)}</p>
+        ${!['delivered', 'cancelled'].includes(o.status) ? html`<details class="mt-8"><summary class="small link" style="cursor:pointer">Changer le créneau</summary>
+          <form class="stack mt-8" style="--s:8px" method="post" action="/admin/commandes/${o.id}/creneau">
+            <div class="field"><label class="label" for="sd">Jour</label><input class="input" type="date" id="sd" name="slot_date" value="${o.slot_date}"></div>
+            <div class="row" style="gap:8px">
+              <div class="field" style="flex:1"><label class="label" for="ss">Début</label><input class="input" type="time" id="ss" name="slot_start" value="${o.slot_start}"></div>
+              <div class="field" style="flex:1"><label class="label" for="se">Fin</label><input class="input" type="time" id="se" name="slot_end" value="${o.slot_end}"></div>
+            </div>
+            <p class="small muted">Une fin plus tôt que le début veut dire après minuit (ex. 23:00 → 02:00).</p>
+            <div><button class="btn btn-ghost btn-sm">Enregistrer le créneau</button></div>
+          </form></details>` : ''}
         <a class="btn btn-ghost btn-sm mt-16" href="${mapsUrl(o)}" target="_blank" rel="noopener">${icon('pin')} Ouvrir dans Maps</a>
         ${o.driver_first_name ? html`<hr class="sep"><p class="label">Livreur</p><p class="mt-8"><strong>${o.driver_first_name} ${o.driver_last_name}</strong> · <a class="link" href="tel:${(o.driver_phone || '').replace(/\s/g, '')}">${o.driver_phone}</a>${o.picked_up_at ? html`<br><span class="small muted">Récupérée à ${fmtTime(o.picked_up_at)}</span>` : ''}</p>` : ''}
       </div></section>

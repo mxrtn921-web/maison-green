@@ -42,7 +42,7 @@ export const orderItems = (orderId) => all('SELECT * FROM order_items WHERE orde
 export const orderEvents = (orderId) => all(`SELECT e.*, u.first_name AS actor_name FROM order_events e LEFT JOIN users u ON u.id = e.actor_id
                                              WHERE e.order_id = ? ORDER BY e.id`, orderId);
 
-function addEvent(orderId, status, label, actorId = null) {
+export function addEvent(orderId, status, label, actorId = null) {
   run('INSERT INTO order_events (order_id, status, label, actor_id) VALUES (?, ?, ?, ?)', orderId, status, label || STATUS[status]?.label || status, actorId);
 }
 

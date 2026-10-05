@@ -15,7 +15,7 @@ import { money } from '../lib/html.js';
 import { parisNow, addDays, parisToUtc, dayLabel, shortDate, weekdayOf, WEEKDAYS } from '../lib/time.js';
 import { categories as listCategories, adminProducts, productById } from '../services/catalog.js';
 import { orderingState } from '../services/delivery.js';
-import { getOrder, orderItems, orderEvents, setStatus, assignDriver, drivers as listDrivers, remitCash, ACTIVE } from '../services/orders.js';
+import { getOrder, orderItems, orderEvents, addEvent, slotLabel, setStatus, assignDriver, drivers as listDrivers, remitCash, ACTIVE } from '../services/orders.js';
 import { refundPayment, paymentsFor } from '../services/payments.js';
 import { notify, notificationsFor, markAllRead } from '../services/notify.js';
 import * as CatalogImport from '../services/catalog-import.js';
@@ -152,6 +152,20 @@ post('/admin/commandes/:id/rembourser', (ctx) => {
   const [cents, err] = v.money({ label: 'Le montant', required: false })(ctx.body.amount);
   if (err) { setFlash(ctx.res, 'error', err); return redirect(ctx.res, `/admin/commandes/${ctx.params.id}`); }
   return orderAction(ctx, async (id) => { const amt = await refundPayment(id, cents, ctx.user); setFlash(ctx.res, 'success', `${money(amt)} remboursés.`); });
+});
+// Changement de créneau par le patron (ex. remettre une commande de 23h sur le créneau 23h – 2h).
+post('/admin/commandes/:id/creneau', (ctx) => {
+  admin(ctx);
+  const id = Number(ctx.params.id);
+  const o = getOrder(id);
+  if (!o) throw new HttpError(404, 'Commande introuvable');
+  const { data, errors, ok } = validate({ slot_date: v.date({ label: 'Le jour' }), slot_start: v.time({ label: 'Le début' }), slot_end: v.time({ label: 'La fin' }) }, ctx.body);
+  if (!ok || data.slot_start === data.slot_end) { setFlash(ctx.res, 'error', Object.values(errors)[0] || 'Le début et la fin du créneau ne peuvent pas être identiques.'); return redirect(ctx.res, `/admin/commandes/${id}`); }
+  run('UPDATE orders SET slot_date = ?, slot_start = ?, slot_end = ? WHERE id = ?', data.slot_date, data.slot_start, data.slot_end, id);
+  const after = getOrder(id);
+  addEvent(id, after.status, `Créneau modifié : ${slotLabel(after)}`, ctx.user.id);
+  setFlash(ctx.res, 'success', `Nouveau créneau : ${slotLabel(after)}.`);
+  redirect(ctx.res, `/admin/commandes/${id}`);
 });
 post('/admin/commandes/:id/note', (ctx) => {
   admin(ctx);
@@ -548,7 +562,8 @@ post('/admin/horaires/ouverture', (ctx) => {
 post('/admin/creneaux', (ctx) => {
   admin(ctx);
   const { data, errors, ok } = validate({ starts_at: v.time({ label: 'Le début' }), ends_at: v.time({ label: 'La fin' }), capacity: v.int({ label: 'La capacité', min: 1, max: 200 }) }, ctx.body);
-  if (!ok || (data.starts_at >= data.ends_at && data.ends_at !== '00:00')) return sendHtml(ctx.res, hoursData(ctx, { form: Object.values(errors)[0] || 'La fin du créneau doit être après son début.' }), 422);
+  // Une fin plus tôt que le début signifie « après minuit » (ex. 23:00 → 02:00).
+  if (!ok || data.starts_at === data.ends_at) return sendHtml(ctx.res, hoursData(ctx, { form: Object.values(errors)[0] || 'Le début et la fin du créneau ne peuvent pas être identiques.' }), 422);
   const days = ctx.body.weekday === 'every' ? [0, 1, 2, 3, 4, 5, 6] : ctx.body.weekday === 'all' ? [1, 2, 3, 4, 5, 6] : [Number(ctx.body.weekday)].filter((d) => d >= 0 && d <= 6);
   tx(() => { for (const d of days) if (!one('SELECT 1 AS x FROM delivery_slots WHERE weekday = ? AND starts_at = ?', d, data.starts_at)) run('INSERT INTO delivery_slots (weekday, starts_at, ends_at, capacity) VALUES (?, ?, ?, ?)', d, data.starts_at, data.ends_at, data.capacity); });
   setFlash(ctx.res, 'success', 'Créneau ajouté.');
