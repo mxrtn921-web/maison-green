@@ -35,7 +35,21 @@ function categoriesV2() {
   for (const [product, cat] of MOVES) run('UPDATE products SET category_id = (SELECT id FROM categories WHERE name = ?) WHERE name = ? AND deleted_at IS NULL', cat, product);
 }
 
-const MIGRATIONS = [['categories_v2', categoriesV2]];
+// Livraisons de 18h à 2h du matin, tous les jours, par créneaux d'une heure.
+// 00h – 01h et 01h – 02h sont rattachés à la soirée de la veille dans la boutique.
+export const DELIVERY_HOURS = ['18:00', '19:00', '20:00', '21:00', '22:00', '23:00', '00:00', '01:00'];
+function deliverySlots18to2() {
+  const capacity = one('SELECT MAX(capacity) AS c FROM delivery_slots')?.c || 6;
+  run('DELETE FROM delivery_slots');
+  for (let wd = 0; wd < 7; wd++) {
+    for (const start of DELIVERY_HOURS) {
+      const end = `${String((Number(start.slice(0, 2)) + 1) % 24).padStart(2, '0')}:00`;
+      run('INSERT INTO delivery_slots (weekday, starts_at, ends_at, capacity) VALUES (?, ?, ?, ?)', wd, start, end, capacity);
+    }
+  }
+}
+
+const MIGRATIONS = [['categories_v2', categoriesV2], ['delivery_slots_18_02', deliverySlots18to2]];
 
 export function runMigrations() {
   const done = new Set(getSetting('migrations', []));
