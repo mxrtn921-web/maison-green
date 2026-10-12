@@ -50,7 +50,7 @@ post('/inscription', (ctx) => {
   if (!errors.email && one('SELECT 1 AS x FROM users WHERE email = ?', data.email)) errors.email = 'Un compte existe déjà avec cet e-mail. Connectez-vous.';
   if (Object.keys(errors).length) return sendHtml(ctx.res, registerPage(ctx, { errors, values: data, next }), 422);
   const id = tx(() => {
-    const r = run("INSERT INTO users (email, password_hash, role, first_name, last_name, phone, marketing_opt_in) VALUES (?, ?, 'customer', ?, ?, ?, ?)",
+    const r = run("INSERT INTO users (email, password_hash, role, first_name, last_name, phone, marketing_opt_in, welcome_delivery_eligible) VALUES (?, ?, 'customer', ?, ?, ?, ?, 1)",
       data.email, hashPassword(data.password), data.first_name, data.last_name, data.phone || '', data.marketing_opt_in ? 1 : 0);
     const uid = Number(r.lastInsertRowid);
     // Rattache les commandes passées sans compte avec le même e-mail.
@@ -58,7 +58,7 @@ post('/inscription', (ctx) => {
     return uid;
   });
   startSession(ctx.req, ctx.res, id);
-  setFlash(ctx.res, 'success', `Bienvenue ${data.first_name} ! Votre compte est prêt.`);
+  setFlash(ctx.res, 'success', `Bienvenue ${data.first_name} ! Votre première livraison est offerte.`);
   redirect(ctx.res, next || '/compte');
 });
 
@@ -68,7 +68,9 @@ post('/deconnexion', (ctx) => { endSession(ctx.req, ctx.res); redirect(ctx.res, 
 
 get('/compte', (ctx) => {
   requireRole(ctx, 'customer');
-  const orders = all(`SELECT o.*, (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id) AS item_count FROM orders o WHERE o.user_id = ? ORDER BY o.id DESC LIMIT 50`, ctx.user.id)
+  const orders = all(`SELECT o.*, (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id) AS item_count,
+      (SELECT rating FROM order_reviews WHERE order_id = o.id) AS review_rating
+    FROM orders o WHERE o.user_id = ? ORDER BY o.id DESC LIMIT 50`, ctx.user.id)
     .map((o) => ({ ...o, items: all('SELECT product_id AS id, quantity AS qty FROM order_items WHERE order_id = ? AND product_id IS NOT NULL', o.id) }));
   sendHtml(ctx.res, accountOrdersPage(ctx, { orders }));
 });
@@ -150,8 +152,10 @@ get('/compte/donnees/export', (ctx) => {
     exported_at: nowIso(),
     profile: one('SELECT email, first_name, last_name, phone, marketing_opt_in, created_at FROM users WHERE id = ?', uid),
     addresses: all('SELECT label, line1, line2, postal_code, city, instructions FROM addresses WHERE user_id = ?', uid),
-    orders: all('SELECT id, number, status, created_at, first_name, last_name, email, phone, address_line1, address_line2, postal_code, city, instructions, slot_date, slot_start, slot_end, subtotal_cents, delivery_fee_cents, total_cents, payment_method, payment_status FROM orders WHERE user_id = ?', uid)
+    orders: all('SELECT id, number, status, created_at, first_name, last_name, email, phone, address_line1, address_line2, postal_code, city, instructions, slot_date, slot_start, slot_end, subtotal_cents, delivery_fee_cents, tip_cents, signup_free_delivery, total_cents, payment_method, payment_status FROM orders WHERE user_id = ?', uid)
       .map((o) => ({ ...o, items: all('SELECT name, unit, unit_price_cents, quantity, line_total_cents FROM order_items WHERE order_id = ?', o.id) })),
+    reviews: all(`SELECT r.order_id, r.rating, r.comment, r.created_at, r.updated_at, o.number
+      FROM order_reviews r JOIN orders o ON o.id = r.order_id WHERE o.user_id = ? ORDER BY r.created_at DESC`, uid),
   };
   send(ctx.res, 200, JSON.stringify(data, null, 2), 'application/json; charset=utf-8', { 'Content-Disposition': 'attachment; filename="maison-green-mes-donnees.json"', 'Cache-Control': 'no-store' });
 });
@@ -164,6 +168,7 @@ post('/compte/supprimer', (ctx) => {
   }
   const uid = ctx.user.id;
   tx(() => {
+    run('DELETE FROM order_reviews WHERE order_id IN (SELECT id FROM orders WHERE user_id = ?)', uid);
     // Les commandes sont conservées (obligation comptable) mais anonymisées.
     run(`UPDATE orders SET first_name = 'Client', last_name = 'supprimé', email = 'anonyme@invalid', phone = '', address_line1 = 'Adresse supprimée',
          address_line2 = '', instructions = '', user_id = NULL WHERE user_id = ?`, uid);

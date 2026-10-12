@@ -334,11 +334,13 @@
     if (!quote) return;
     box.innerHTML = quote.lines.map((l) => lineHtml(l, true)).join('');
     const fee = quote.zone ? quote.zone.fee : null;
-    const total = quote.subtotal + (fee || 0);
+    const tip = Math.max(0, Number($('[data-tip-cents]')?.value || 0));
+    const total = quote.subtotal + (fee || 0) + tip;
     const missing = quote.zone ? Math.max(0, quote.zone.min - quote.subtotal) : 0;
     $('[data-summary-totals]').innerHTML = `
       <div class="muted"><span>Sous-total</span><span class="price">${money(quote.subtotal)}</span></div>
-      <div class="muted"><span>Livraison${quote.zone ? ` · ${esc(quote.zone.name)}` : ''}</span><span>${fee === null ? 'selon code postal' : fee ? money(fee) : 'Offerte'}</span></div>
+      <div class="muted"><span>Livraison${quote.zone ? ` · ${esc(quote.zone.name)}` : ''}</span><span>${fee === null ? 'selon code postal' : fee ? money(fee) : quote.zone?.welcome_free ? 'Offerte · bienvenue' : 'Offerte'}</span></div>
+      ${tip ? `<div class="muted"><span>Pourboire</span><span>${money(tip)}</span></div>` : ''}
       <div class="grand"><span>Total</span><span class="price">${money(total)}</span></div>
       ${missing ? `<div class="notice notice-warn mt-8" style="font-size:13px">${ICON.alert}<span>Minimum de commande pour cette zone : ${money(quote.zone.min)}. Il manque ${money(missing)}.</span></div>` : ''}`;
     const peek = $('[data-sum-peek]'); if (peek) peek.textContent = `${count()} article${count() > 1 ? 's' : ''} · ${money(total)}`;
@@ -352,7 +354,7 @@
       const cp = postal.value.trim();
       const z = data.zones.find((x) => x.codes.includes(cp));
       if (cp.length < 5) { hint.textContent = ''; hint.className = 'zone-hint'; }
-      else if (z) { hint.textContent = `${z.name} · livraison ${z.fee ? money(z.fee) : 'offerte'}`; hint.className = 'zone-hint ok'; }
+      else if (z) { hint.textContent = `${z.name} · livraison ${z.welcome_free ? 'offerte avec votre offre de bienvenue' : z.fee ? money(z.fee) : 'offerte'}`; hint.className = 'zone-hint ok'; }
       else { hint.textContent = 'Nous ne livrons pas encore ce code postal.'; hint.className = 'zone-hint ko'; }
       refreshQuote();
     };
@@ -362,6 +364,19 @@
       $$('[data-slots-for]').forEach((s) => { s.hidden = s.dataset.slotsFor !== b.dataset.day; });
     }));
     const det = $('[data-sum-details]'); if (det && matchMedia('(max-width: 999px)').matches) det.open = false;
+    const tipChoice = $('[data-tip-choice]'); const tipCustom = $('[data-tip-custom]');
+    const tipCustomWrap = $('[data-tip-custom-wrap]'); const tipCents = $('[data-tip-cents]');
+    const updateTip = () => {
+      const custom = tipChoice?.value === 'custom';
+      if (tipCustomWrap) tipCustomWrap.hidden = !custom;
+      if (tipCustom) tipCustom.disabled = !custom;
+      const cents = custom ? Math.round(Number(tipCustom?.value || 0) * 100) : Number(tipChoice?.value || 0);
+      if (tipCents) tipCents.value = String(Number.isFinite(cents) ? Math.max(0, cents) : 0);
+      renderSummary();
+    };
+    tipChoice?.addEventListener('change', updateTip);
+    tipCustom?.addEventListener('input', updateTip);
+    updateTip();
     co.addEventListener('input', (e) => { const f = e.target.closest('.field.has-error'); if (f) { f.classList.remove('has-error'); $$('.error-text', f).forEach((x) => x.remove()); } });
     co.addEventListener('change', (e) => { if (e.target.name === 'slot' || e.target.name === 'accept_terms') { const x = $(`[data-err="${e.target.name}"]`); if (x) x.hidden = true; } });
     const firstFree = $('input[name="slot"]:not(:disabled)'); if (firstFree) firstFree.checked = true;

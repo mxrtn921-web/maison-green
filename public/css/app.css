@@ -829,6 +829,22 @@ a.add-btn { text-decoration: none; }
 .shelf .tag.photo { background: #fff; }
 @media (min-width: 900px) { .shelf .tag:nth-child(2), .shelf .tag:nth-child(5) { transform: none; } }
 
+/* Offre de bienvenue affichée en haut de l'accueil */
+.welcome-offer { background: var(--green); color: #fff; }
+.welcome-offer .wrap { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 8px; padding-bottom: 8px; }
+.welcome-offer-copy { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 6px; line-height: 1.3; }
+.welcome-offer-copy strong { font-weight: 700; }
+.welcome-offer-copy span { color: rgba(255,255,255,.82); font-size: 13px; }
+.welcome-offer-link { flex: none; display: inline-flex; align-items: center; gap: 6px; color: #fff; font-size: 13px; font-weight: 650; text-decoration: none; }
+.welcome-offer-link .icon { width: 15px; height: 15px; }
+@media (max-width: 520px) { .welcome-offer .wrap { align-items: flex-start; flex-direction: column; gap: 6px; } }
+
+/* Avis clients */
+.review-stars { color: #b27a12; letter-spacing: 1px; white-space: nowrap; }
+.review-rating-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.review-rating-option { display: inline-flex; align-items: center; gap: 5px; min-height: 42px; padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--paper); cursor: pointer; }
+.review-rating-option:has(input:checked) { border-color: var(--green); background: var(--green-tint); }
+
 /* Rayons : léger relief au survol */
 .cat-tile { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 8%, transparent); }
 @media (hover: hover) { .cat-tile:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 16%, transparent), 0 10px 24px -16px rgba(23, 24, 26, .3); } }

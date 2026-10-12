@@ -1,5 +1,5 @@
 import { html, raw, money } from '../../lib/html.js';
-import { icon, productTag } from '../ui.js';
+import { icon, productTag, ratingStars } from '../ui.js';
 import { shopLayout } from './layout.js';
 import { FLOW, STATUS, slotLabel } from '../../services/orders.js';
 import { fmtTime } from '../../lib/time.js';
@@ -17,7 +17,7 @@ const HEADLINES = {
   cancelled: ['Commande annulée', ''],
 };
 
-export function trackPage(ctx, { order: o, items, events, justPaid, paymentCancelled }) {
+export function trackPage(ctx, { order: o, items, events, review = null, justPaid, paymentCancelled }) {
   const [title, sub] = HEADLINES[o.status];
   const reached = new Map(); // statut → heure de passage
   for (const e of events) if (!reached.has(e.status)) reached.set(e.status, e.created_at);
@@ -60,6 +60,17 @@ export function trackPage(ctx, { order: o, items, events, justPaid, paymentCance
       ${o.driver_first_name && ['assigned', 'out_for_delivery'].includes(o.status) ? html`
         <div class="driver-chip"><span class="avatar">${o.driver_first_name[0]}</span><div><strong>${o.driver_first_name}</strong><div class="small muted">Votre livreur Maison Green</div></div></div>` : ''}
 
+      ${o.status === 'delivered' ? html`<section class="panel mt-24"><div class="panel-head"><h2>${review ? 'Votre avis' : 'Comment s’est passée la livraison ?'}</h2>${review ? ratingStars(review.rating) : ''}</div><div class="panel-body">
+        <p class="small muted mb-16">Une note et un commentaire facultatif nous aident à améliorer le service.</p>
+        <form method="post" action="/suivi/${o.tracking_token}/avis" class="stack" style="--s:14px">
+          <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:8px">Votre note</legend><div class="review-rating-options" role="radiogroup" aria-label="Votre note sur 5">
+            ${[1, 2, 3, 4, 5].map((n) => html`<label class="review-rating-option"><input type="radio" name="rating" value="${n}" ${raw(review?.rating === n ? 'checked' : '')} required><span class="review-stars">${'★'.repeat(n)}</span><span class="small">${n}</span></label>`)}
+          </div></fieldset>
+          <div class="field"><label for="review-comment">Commentaire <span class="muted" style="font-weight:400">(facultatif)</span></label><textarea class="textarea" id="review-comment" name="comment" maxlength="1000" placeholder="Votre retour sur la livraison…">${review?.comment || ''}</textarea></div>
+          <div><button class="btn btn-dark">${review ? 'Mettre à jour mon avis' : 'Envoyer mon avis'}</button></div>
+        </form>
+      </div></section>` : ''}
+
       ${cashDue ? html`<div class="notice notice-warn mt-24">${icon('cash')}<span>Paiement en espèces à la livraison : prévoyez <strong>${money(o.total_cents)}</strong>, l'appoint si possible.</span></div>` : ''}
       ${!ctx.user && o.status !== 'cancelled' ? html`<div class="info-card mt-24"><h3>Gardez vos commandes au même endroit</h3><p class="small">Créez un compte avec ${o.email} pour retrouver cette commande, vos adresses et commander plus vite la prochaine fois.</p><a class="btn btn-ghost btn-sm mt-16" href="/inscription?email=${encodeURIComponent(o.email)}">Créer mon compte</a></div>` : ''}
     </div>
@@ -75,7 +86,8 @@ export function trackPage(ctx, { order: o, items, events, justPaid, paymentCance
         ${items.map((i) => html`<div class="line" style="grid-template-columns:1fr auto;padding:8px 0"><span class="small"><span class="qty-dot">${i.quantity}×</span> ${i.name}</span><span class="small price">${money(i.line_total_cents)}</span></div>`)}
         <div class="totals mt-8">
           <div class="muted"><span>Sous-total</span><span>${money(o.subtotal_cents)}</span></div>
-          <div class="muted"><span>Livraison · ${o.zone_name}</span><span>${o.delivery_fee_cents ? money(o.delivery_fee_cents) : 'Offerte'}</span></div>
+          <div class="muted"><span>Livraison · ${o.zone_name}</span><span>${o.delivery_fee_cents ? money(o.delivery_fee_cents) : o.signup_free_delivery ? 'Offerte · bienvenue' : 'Offerte'}</span></div>
+          ${o.tip_cents ? html`<div class="muted"><span>Pourboire</span><span>${money(o.tip_cents)}</span></div>` : ''}
           <div class="grand"><span>Total</span><span class="price">${money(o.total_cents)}</span></div>
         </div>
         <p class="small muted mt-16">${o.payment_method === 'cash' ? 'Espèces à la livraison' : 'Carte bancaire'} · ${o.payment_status === 'paid' ? 'payé' : o.payment_status === 'refunded' ? 'remboursé' : o.payment_status === 'due_on_delivery' ? 'à régler au livreur' : 'en attente'}</p>

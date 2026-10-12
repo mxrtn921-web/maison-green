@@ -77,6 +77,7 @@ export function driverRunPage(ctx, { driver, order: o, items }) {
       <p class="big-addr">${o.address_line1}</p>
       ${o.address_line2 ? html`<p style="font-size:16px;font-weight:600">${o.address_line2}</p>` : ''}
       <p class="muted">${o.postal_code} ${o.city} · ${slotLabel(o)}</p>
+      ${o.tip_cents ? html`<p class="small muted">Pourboire inclus dans le paiement : <strong>${money(o.tip_cents)}</strong></p>` : ''}
       <div class="map-btns">
         <a class="btn btn-ghost" href="${gmaps(o)}" target="_blank" rel="noopener">${icon('pin')} Google Maps</a>
         <a class="btn btn-ghost" href="${amaps(o)}" target="_blank" rel="noopener">${icon('map')} Apple Plans</a>

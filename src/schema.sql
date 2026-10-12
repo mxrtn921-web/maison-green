@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
   phone         TEXT NOT NULL DEFAULT '',
   stripe_customer_id TEXT,
   marketing_opt_in INTEGER NOT NULL DEFAULT 0,
+  welcome_delivery_eligible INTEGER NOT NULL DEFAULT 0,
+  welcome_delivery_order_id INTEGER,
   is_active     INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   deleted_at    TEXT
@@ -141,6 +143,8 @@ CREATE TABLE IF NOT EXISTS orders (
   slot_end        TEXT NOT NULL,
   subtotal_cents  INTEGER NOT NULL,
   delivery_fee_cents INTEGER NOT NULL,
+  tip_cents       INTEGER NOT NULL DEFAULT 0 CHECK (tip_cents >= 0),
+  signup_free_delivery INTEGER NOT NULL DEFAULT 0,
   total_cents     INTEGER NOT NULL,
   payment_method  TEXT NOT NULL CHECK (payment_method IN ('card','cash')),
   payment_status  TEXT NOT NULL CHECK (payment_status IN
@@ -173,6 +177,15 @@ CREATE TABLE IF NOT EXISTS order_items (
   line_total_cents INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_items_order ON order_items(order_id);
+
+-- Un avis par livraison terminée ; il reste rattaché à la commande après inscription d'un invité.
+CREATE TABLE IF NOT EXISTS order_reviews (
+  order_id   INTEGER PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+  rating     INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment    TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
 
 -- Historique des statuts (traçabilité)
 CREATE TABLE IF NOT EXISTS order_events (

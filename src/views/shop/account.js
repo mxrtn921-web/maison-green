@@ -1,5 +1,5 @@
 import { html, raw, money } from '../../lib/html.js';
-import { icon, fieldErr, statusBadge } from '../ui.js';
+import { icon, fieldErr, statusBadge, ratingStars } from '../ui.js';
 import { shopLayout } from './layout.js';
 import { ACTIVE, slotLabel } from '../../services/orders.js';
 import { fmtDateTime } from '../../lib/time.js';
@@ -27,6 +27,7 @@ export function registerPage(ctx, { errors = {}, values = {}, next = '' }) {
   const body = html`<div class="wrap"><div class="auth">
     <h1 class="h1">Créer un compte</h1>
     <p class="muted">Vos adresses et vos commandes au même endroit. Deux minutes, pas plus.</p>
+    <div class="notice notice-success mt-24">${icon('bike')}<span>Votre première livraison sera offerte après la création de votre compte.</span></div>
     ${errors.form ? html`<div class="notice notice-error mt-24" role="alert">${icon('alert')}<span>${errors.form}</span></div>` : ''}
     <form method="post" action="/inscription" novalidate>
       <input type="hidden" name="suite" value="${next}">
@@ -66,14 +67,14 @@ export function accountOrdersPage(ctx, { orders }) {
   const past = orders.filter((o) => !current.includes(o));
   const row = (o) => html`<a class="row-link" href="/suivi/${o.tracking_token}">
     <span class="row-title">${o.number} · ${money(o.total_cents)}</span>${statusBadge(o.status)}
-    <span class="row-meta">${fmtDateTime(o.created_at)} · ${o.item_count} article${o.item_count > 1 ? 's' : ''}${ACTIVE.includes(o.status) ? ` · livraison ${slotLabel(o)}` : ''}</span>
+    <span class="row-meta">${fmtDateTime(o.created_at)} · ${o.item_count} article${o.item_count > 1 ? 's' : ''}${ACTIVE.includes(o.status) ? ` · livraison ${slotLabel(o)}` : ''}${o.review_rating ? html` · ${ratingStars(o.review_rating)}` : ''}</span>
     <span class="row-meta">${icon('chevron')}</span>
   </a>`;
   return accountShell(ctx, 'orders', html`
     ${current.length ? html`<h2 class="h3" style="margin-bottom:10px">En cours</h2><div class="list-rows" style="margin-bottom:36px">${current.map(row)}</div>` : ''}
     <h2 class="h3" style="margin-bottom:10px">Commandes précédentes</h2>
     ${past.length ? html`<div class="list-rows">${past.map((o) => html`<div class="row-link" style="grid-template-columns:1fr auto">
-      <a href="/suivi/${o.tracking_token}" style="text-decoration:none"><span class="row-title">${o.number} · ${money(o.total_cents)}</span><br><span class="row-meta">${fmtDateTime(o.created_at)} · ${o.item_count} article${o.item_count > 1 ? 's' : ''}</span></a>
+      <a href="/suivi/${o.tracking_token}" style="text-decoration:none"><span class="row-title">${o.number} · ${money(o.total_cents)}</span><br><span class="row-meta">${fmtDateTime(o.created_at)} · ${o.item_count} article${o.item_count > 1 ? 's' : ''}${o.review_rating ? html` · ${ratingStars(o.review_rating)}` : o.status === 'delivered' ? ' · Donner votre avis' : ''}</span></a>
       <div class="row">${statusBadge(o.status)}<button class="btn btn-ghost btn-sm" type="button" data-reorder='${JSON.stringify(o.items)}'>${icon('refresh')} Recommander</button></div>
     </div>`)}</div>` : html`<p class="muted">Aucune commande pour le moment. <a class="link" href="/boutique">Découvrir la boutique</a></p>`}
   `);

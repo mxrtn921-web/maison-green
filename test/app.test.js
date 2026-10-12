@@ -63,6 +63,13 @@ const placePaidOrder = async (c, extra = {}) => {
   return token;
 };
 const productStock = async (admin, id) => Number(/name="stock" type="number" min="0" value="(\d+)"/.exec((await admin.get(`/admin/produits/${id}`)).text)[1]);
+const euroCents = (value) => Math.round(Number(String(value).replace(/[^\d,-]/g, '').replace(',', '.')) * 100);
+const annualTotals = async (admin, year) => {
+  const html = (await admin.get(`/admin/chiffre-affaires?annee=${year}`)).text;
+  const row = new RegExp(`<td class="strong">Total ${year}<\\/td><td class="r strong">\\d+<\\/td><td class="r strong">([^<]+)<\\/td><td class="r">([^<]+)<\\/td><td class="r">([^<]+)<\\/td>`).exec(html);
+  assert.ok(row, `ligne de total ${year} absente`);
+  return { revenue: euroCents(row[1]), delivery: euroCents(row[2]), tips: euroCents(row[3]) };
+};
 
 test('pages publiques accessibles', async () => {
   const c = client();
@@ -248,6 +255,64 @@ test('inscription, adresse, export RGPD, suppression', async () => {
   assert.equal(exp.data.addresses.length, 1);
   await c.post('/compte/supprimer', { form: { password: 'motdepasse-solide' } });
   assert.equal((await client().post('/connexion', { form: { email, password: 'motdepasse-solide' } })).status, 401);
+});
+
+test('offre de bienvenue, pourboire, avis après livraison et fiche client', async () => {
+  const c = client(); const admin = client();
+  await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const email = `avis${Date.now()}@exemple.fr`;
+  assert.match((await c.get('/')).text, /Votre première livraison est offerte/);
+  const signup = await c.post('/inscription', { form: { first_name: 'Lina', last_name: 'Test', email, phone: '', password: 'motdepasse-solide', accept: 'on' } });
+  assert.equal(signup.status, 303);
+  const quote = (items = [{ id: 1, qty: 1 }]) => c.post('/api/cart/quote', { json: { items, postal_code: '76000' } });
+  assert.equal((await quote()).data.zone.fee, 0);
+  assert.equal((await quote()).data.zone.welcome_free, true);
+
+  // Une commande annulée libère l’offre pour une nouvelle tentative.
+  const cancelled = await c.post('/api/orders', { json: checkout(await firstSlot(c), { email, items: [{ id: 1, qty: 1 }], tip_cents: 125 }) });
+  assert.equal(cancelled.status, 201, JSON.stringify(cancelled.data));
+  const cancelledToken = cancelled.data.redirect.split('/').pop();
+  const cancelledId = Number(/MG-(\d+)/.exec((await c.get(`/suivi/${cancelledToken}`)).text)[1]) - 1000;
+  assert.equal((await quote()).data.zone.fee, 299, 'l’offre est réservée pendant le paiement');
+  await admin.post(`/admin/commandes/${cancelledId}/statut`, { form: { status: 'cancelled', reason: 'Test' } });
+  assert.equal((await quote()).data.zone.fee, 0, 'l’annulation rend l’offre au compte');
+
+  const first = await c.post('/api/orders', { json: checkout(await firstSlot(c), { email, items: [{ id: 1, qty: 1 }] }) });
+  assert.equal(first.status, 201, JSON.stringify(first.data));
+  const token = first.data.redirect.split('/').pop();
+  let track = (await c.get(`/suivi/${token}`)).text;
+  const orderId = Number(/MG-(\d+)/.exec(track)[1]) - 1000;
+  assert.match(track, /Offerte · bienvenue/);
+  assert.doesNotMatch(track, /Comment s’est passée la livraison/);
+  await c.post(`/suivi/${token}/avis`, { form: { rating: '5', comment: 'Avis trop tôt' } });
+  await c.post(`/paiement-demo/${token}`, { form: { result: 'success' } });
+  assert.equal((await quote()).data.zone.fee, 299, 'l’offre est consommée après la première commande');
+  await admin.post(`/admin/commandes/${orderId}/statut`, { form: { status: 'delivered' } });
+  track = (await c.get(`/suivi/${token}`)).text;
+  assert.match(track, /Comment s’est passée la livraison/);
+  assert.equal((await c.post(`/suivi/${token}/avis`, { form: { rating: '4', comment: 'Livraison très bien.' } })).status, 303);
+  assert.match((await c.get(`/suivi/${token}`)).text, /Votre avis/);
+  assert.match((await c.get('/compte')).text, /review-stars/);
+  assert.match((await admin.get('/admin/clients')).text, new RegExp(email));
+  const fiche = await admin.get(`/admin/clients/${Number(/href="\/admin\/clients\/(\d+)"[^>]*>Lina Test/.exec((await admin.get('/admin/clients')).text)[1])}`);
+  assert.match(fiche.text, /Livraison très bien\./);
+  assert.match(fiche.text, /4 étoile/);
+
+  // Un remboursement qui dépasse les ventes conserve les montants encaissés sans créer de CA négatif.
+  const year = new Date().getFullYear();
+  const before = await annualTotals(admin, year);
+  const tipped = await c.post('/api/orders', { json: checkout(await firstSlot(c), { email, items: [{ id: 1, qty: 1 }], tip_cents: 500 }) });
+  assert.equal(tipped.status, 201, JSON.stringify(tipped.data));
+  const tippedToken = tipped.data.redirect.split('/').pop();
+  const tippedPage = (await c.get(`/suivi/${tippedToken}`)).text;
+  assert.match(tippedPage, /Pourboire/);
+  assert.match(tippedPage, /11,39/);
+  const tippedId = Number(/MG-(\d+)/.exec(tippedPage)[1]) - 1000;
+  await c.post(`/paiement-demo/${tippedToken}`, { form: { result: 'success' } });
+  await admin.post(`/admin/commandes/${tippedId}/rembourser`, { form: { amount: '10,90' } });
+  const after = await annualTotals(admin, year);
+  assert.equal(after.revenue, before.revenue, 'le CA net ne devient pas négatif');
+  assert.equal(after.tips, before.tips + 49, 'le pourboire retenu est plafonné au montant restant encaissé');
 });
 
 test('admin : produit, catégorie, zone, créneau, pause des commandes', async () => {
@@ -539,6 +604,18 @@ test('remise à zéro avant l’ouverture (dernier test : efface les commandes)'
   assert.ok(before > 2);
   await admin.post('/admin/remise-a-zero', { form: { confirm: 'oui' } });
   assert.equal((await admin.get('/admin/chiffre-affaires/export.csv')).text.trim().split('\r\n').length, before, 'sans confirmation, rien n’est effacé');
+  const retained = client();
+  const email = `reset${Date.now()}@exemple.fr`;
+  const productId = Number(/href="\/admin\/produits\/(\d+)"[^>]*>Baguette tradition/.exec((await admin.get('/admin/produits')).text)[1]);
+  await retained.post('/inscription', { form: { first_name: 'Compte', last_name: 'Conservé', email, password: 'motdepasse-solide', accept: 'on' } });
+  const quote = () => retained.post('/api/cart/quote', { json: { items: [{ id: productId, qty: 1 }], postal_code: '76000' } });
+  assert.equal((await quote()).data.zone.fee, 0);
+  const order = await retained.post('/api/orders', { json: checkout(await firstSlot(retained), { email, items: [{ id: productId, qty: 1 }] }) });
+  assert.equal(order.status, 201, JSON.stringify(order.data));
+  assert.equal((await quote()).data.zone.fee, 299, 'l’offre est réservée par cette commande');
+  await admin.post('/admin/remise-a-zero', { form: { confirm: 'EFFACER' } });
+  assert.equal((await admin.get('/admin/chiffre-affaires/export.csv')).text.trim().split('\r\n').length, 1, 'les commandes ont été effacées');
+  assert.equal((await quote()).data.zone.fee, 0, 'les comptes conservés récupèrent leur offre après la remise à zéro');
   assert.equal((await admin.post('/admin/remise-a-zero', { form: { confirm: 'effacer', customers: '1' } })).status, 303);
   assert.equal((await admin.get('/admin/chiffre-affaires/export.csv')).text.trim().split('\r\n').length, 1, 'plus aucune commande');
   assert.match((await client().get('/boutique')).text, /Pommes Belchard|Baguette/, 'le catalogue est conservé');

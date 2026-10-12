@@ -36,11 +36,11 @@ get('/admin', (ctx) => {
   const today = startOf(now.date);
   const d30 = startOf(addDays(now.date, -29));
   const VALID = "status NOT IN ('cancelled','awaiting_payment')";
-  const sum = (from) => one(`SELECT COALESCE(SUM(total_cents),0) AS revenue, COUNT(*) AS count FROM orders WHERE ${VALID} AND created_at >= ?`, from);
+  const sum = (from) => one(`SELECT COALESCE(SUM(total_cents - tip_cents),0) AS revenue, COALESCE(SUM(tip_cents),0) AS tips, COUNT(*) AS count FROM orders WHERE ${VALID} AND created_at >= ?`, from);
   const series = [];
   for (let i = 13; i >= 0; i--) {
     const date = addDays(now.date, -i);
-    const r = one(`SELECT COALESCE(SUM(total_cents),0) AS total, COUNT(*) AS count FROM orders WHERE ${VALID} AND created_at >= ? AND created_at < ?`, startOf(date), startOf(addDays(date, 1)));
+    const r = one(`SELECT COALESCE(SUM(total_cents - tip_cents),0) AS total, COUNT(*) AS count FROM orders WHERE ${VALID} AND created_at >= ? AND created_at < ?`, startOf(date), startOf(addDays(date, 1)));
     series.push({ date, total: r.total, count: r.count, label: dayLabel(date, now.date), short: i === 0 ? 'Auj.' : `${WEEKDAYS[weekdayOf(date)].slice(0, 2)} ${Number(date.slice(8))}` });
   }
   const stats = {
@@ -88,10 +88,10 @@ get('/admin/chiffre-affaires/export.csv', (ctx) => {
   const year = reportYear(ctx);
   const eur = (c) => (c / 100).toFixed(2).replace('.', ',');
   const cell = (s) => { const t = String(s ?? ''); return /[;"\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-  const rows = [['Numéro', 'Date', 'Heure', 'Client', 'Statut', 'Paiement', 'Produits TTC', 'Livraison TTC', 'Total TTC', 'Remboursé', 'Net encaissé']];
+  const rows = [['Numéro', 'Date', 'Heure', 'Client', 'Statut', 'Paiement', 'Produits TTC', 'Livraison TTC', 'Pourboire TTC', 'Total TTC', 'Remboursé', 'Net encaissé']];
   for (const o of yearOrders(year)) {
     rows.push([o.number, o.paris.date.split('-').reverse().join('/'), o.paris.time, `${o.first_name} ${o.last_name}`, o.status === 'delivered' ? 'Livrée' : 'En cours',
-      o.payment_method === 'card' ? 'Carte' : 'Espèces', eur(o.subtotal_cents), eur(o.delivery_fee_cents), eur(o.total_cents), eur(o.refunded_cents), eur(o.total_cents - o.refunded_cents)]);
+      o.payment_method === 'card' ? 'Carte' : 'Espèces', eur(o.subtotal_cents), eur(o.delivery_fee_cents), eur(o.tip_cents), eur(o.total_cents), eur(o.refunded_cents), eur(o.total_cents - o.refunded_cents)]);
   }
   send(ctx.res, 200, '\ufeff' + rows.map((r) => r.map(cell).join(';')).join('\r\n') + '\r\n', 'text/csv; charset=utf-8',
     { 'Content-Disposition': `attachment; filename="commandes-maison-green-${year}.csv"`, 'Cache-Control': 'no-store' });
@@ -131,6 +131,31 @@ get('/admin/commandes/:id', (ctx) => {
   const o = getOrder(Number(ctx.params.id));
   if (!o) throw new HttpError(404, 'Commande introuvable');
   sendHtml(ctx.res, V.orderDetailPage(ctx, { order: o, items: orderItems(o.id), events: orderEvents(o.id), drivers: listDrivers(), payments: paymentsFor(o.id) }));
+});
+
+get('/admin/clients', (ctx) => {
+  admin(ctx);
+  const q = String(ctx.query.get('q') || '').trim().slice(0, 80);
+  let sql = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, COUNT(DISTINCT o.id) AS order_count,
+      COUNT(DISTINCT r.order_id) AS review_count, AVG(r.rating) AS average_rating
+    FROM users u LEFT JOIN orders o ON o.user_id = u.id LEFT JOIN order_reviews r ON r.order_id = o.id
+    WHERE u.role = 'customer' AND u.deleted_at IS NULL`;
+  const params = [];
+  if (q) { sql += " AND (u.first_name || ' ' || u.last_name LIKE ? OR u.email LIKE ? OR REPLACE(u.phone, ' ', '') LIKE ?)"; params.push(`%${q}%`, `%${q}%`, `%${q.replace(/\s/g, '')}%`); }
+  sql += ' GROUP BY u.id ORDER BY MAX(o.created_at) DESC, u.created_at DESC LIMIT 200';
+  sendHtml(ctx.res, V.clientsPage(ctx, { clients: all(sql, ...params), q }));
+});
+
+get('/admin/clients/:id', (ctx) => {
+  admin(ctx);
+  const id = Number(ctx.params.id);
+  const client = one("SELECT id, first_name, last_name, email, phone, created_at FROM users WHERE id = ? AND role = 'customer' AND deleted_at IS NULL", id);
+  if (!client) throw new HttpError(404, 'Client introuvable.');
+  const orders = all(`SELECT o.*, (SELECT rating FROM order_reviews WHERE order_id = o.id) AS review_rating
+    FROM orders o WHERE o.user_id = ? ORDER BY o.created_at DESC`, id);
+  const reviews = all(`SELECT r.order_id, r.rating, r.comment, r.created_at, r.updated_at, o.number
+    FROM order_reviews r JOIN orders o ON o.id = r.order_id WHERE o.user_id = ? ORDER BY r.created_at DESC`, id);
+  sendHtml(ctx.res, V.clientPage(ctx, { client, orders, reviews }));
 });
 
 async function orderAction(ctx, fn, okMsg) {
@@ -484,6 +509,7 @@ post('/admin/remise-a-zero', (ctx) => {
     run('DELETE FROM notifications');
     run('DELETE FROM webhook_events');
     Analytics.clearAnalytics(); // visites de test
+    run('UPDATE users SET welcome_delivery_order_id = NULL WHERE welcome_delivery_order_id IS NOT NULL');
     run('DELETE FROM orders');
     run("DELETE FROM sqlite_sequence WHERE name IN ('orders','order_items','order_events','payments','notifications')");
     if (ctx.body.customers) {

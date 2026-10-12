@@ -9,7 +9,7 @@ import { getOrder, orderItems, driverAction } from '../services/orders.js';
 import { driverHomePage, driverRunPage } from '../views/driver/pages.js';
 
 const driverOf = (ctx) => { requireRole(ctx, 'driver'); return one('SELECT * FROM drivers WHERE user_id = ?', ctx.user.id) || { vehicle: '', is_available: 1 }; };
-const SELECT = `SELECT id, number, status, address_line1, postal_code, city, slot_date, slot_start, slot_end, total_cents, payment_method, payment_status,
+const SELECT = `SELECT id, number, status, address_line1, postal_code, city, slot_date, slot_start, slot_end, total_cents, tip_cents, payment_method, payment_status,
                 cash_to_collect_cents, delivered_at, driver_id FROM orders`;
 
 get('/livreur', (ctx) => {

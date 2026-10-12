@@ -45,7 +45,8 @@ export function orderEmail(order, items, kind) {
   const url = `${config.baseUrl}/suivi/${order.tracking_token}`;
   const lines = items.map((i) => `<tr><td style="padding:6px 0">${i.quantity} × ${esc(i.name)}</td><td style="text-align:right">${money(i.line_total_cents)}</td></tr>`).join('');
   const recap = `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0">${lines}
-    <tr><td style="padding:6px 0;color:#6B6E73">Livraison</td><td style="text-align:right;color:#6B6E73">${money(order.delivery_fee_cents)}</td></tr>
+    <tr><td style="padding:6px 0;color:#6B6E73">Livraison</td><td style="text-align:right;color:#6B6E73">${order.delivery_fee_cents ? money(order.delivery_fee_cents) : order.signup_free_delivery ? 'Offerte · bienvenue' : 'Offerte'}</td></tr>
+    ${order.tip_cents ? `<tr><td style="padding:6px 0;color:#6B6E73">Pourboire</td><td style="text-align:right;color:#6B6E73">${money(order.tip_cents)}</td></tr>` : ''}
     <tr><td style="padding:10px 0;border-top:1px solid #E7E5DF;font-weight:700">Total</td><td style="text-align:right;border-top:1px solid #E7E5DF;font-weight:700">${money(order.total_cents)}</td></tr></table>`;
   const payLine = order.payment_method === 'cash'
     ? `<p style="font-size:15px">Paiement en espèces à la livraison : prévoyez <strong>${money(order.total_cents)}</strong>.</p>`
@@ -59,7 +60,7 @@ export function orderEmail(order, items, kind) {
   if (kind === 'delivered') {
     return {
       subject: `Commande ${order.number} livrée`,
-      html: layout('Votre commande est arrivée.', `<p style="font-size:15px;line-height:1.5">Bonne dégustation ! Merci d'avoir choisi Maison Green. Votre commande <strong>${esc(order.number)}</strong> a été livrée.</p>${recap}${btn(`${config.baseUrl}/boutique`, 'Recommander')}`),
+      html: layout('Votre commande est arrivée.', `<p style="font-size:15px;line-height:1.5">Bonne dégustation ! Merci d'avoir choisi Maison Green. Votre commande <strong>${esc(order.number)}</strong> a été livrée.</p>${recap}${btn(url, 'Donner mon avis')}<p style="margin-top:12px">${btn(`${config.baseUrl}/boutique`, 'Recommander')}</p>`),
     };
   }
   if (kind === 'cancelled') {

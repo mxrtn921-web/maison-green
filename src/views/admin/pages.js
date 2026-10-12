@@ -1,5 +1,5 @@
 import { html, raw, money, centsToInput } from '../../lib/html.js';
-import { icon, statusBadge, paymentBadge, productTag, fieldErr } from '../ui.js';
+import { icon, statusBadge, paymentBadge, productTag, fieldErr, ratingStars } from '../ui.js';
 import { adminLayout } from './layout.js';
 import { STATUS, PAYMENT_STATUS, allowedNext, slotLabel } from '../../services/orders.js';
 import { fmtDateTime, fmtTime, WEEKDAYS, dayLabel, hLabel, shortDate } from '../../lib/time.js';
@@ -24,7 +24,7 @@ export function dashboardPage(ctx, s) {
 
   ${s.backupDue ? html`<div class="notice notice-warn" style="margin-bottom:16px">${icon('alert')}<span>Pas de sauvegarde depuis plus d'un mois. <a class="link" href="/admin/horaires#sauvegarde">Télécharger une sauvegarde</a> (30 secondes).</span></div>` : ''}
   <div class="kpis">
-    <div class="kpi accent"><span class="k-label">Chiffre d'affaires du jour</span><span class="k-value">${money(s.today.revenue)}</span><span class="k-sub">${s.today.count} commande${s.today.count > 1 ? 's' : ''} · panier moyen ${money(s.today.count ? Math.round(s.today.revenue / s.today.count) : 0)}</span></div>
+    <div class="kpi accent"><span class="k-label">Chiffre d'affaires du jour</span><span class="k-value">${money(s.today.revenue)}</span><span class="k-sub">${s.today.count} commande${s.today.count > 1 ? 's' : ''} · panier moyen ${money(s.today.count ? Math.round(s.today.revenue / s.today.count) : 0)} · ${money(s.today.tips)} de pourboires</span></div>
     <a class="kpi" href="/admin/commandes?vue=en-cours"><span class="k-label">En cours</span><span class="k-value">${s.active}</span><span class="k-sub">${s.toConfirm} à confirmer</span></a>
     <a class="kpi" href="/admin/commandes?vue=livrees"><span class="k-label">Livrées aujourd'hui</span><span class="k-value">${s.deliveredToday}</span><span class="k-sub">${s.cancelled30} annulée${s.cancelled30 > 1 ? 's' : ''} sur 30 jours</span></a>
     ${s.cashDue + s.cashHeld ? html`<a class="kpi cash" href="/admin/commandes?vue=especes"><span class="k-label">Espèces à récupérer</span><span class="k-value">${money(s.cashDue + s.cashHeld)}</span><span class="k-sub">${money(s.cashDue)} à encaisser · ${money(s.cashHeld)} chez les livreurs</span></a>` : ''}
@@ -33,7 +33,7 @@ export function dashboardPage(ctx, s) {
   <div class="dash-grid">
     <div class="panels">
       <section class="panel">
-        <div class="panel-head"><h2>Chiffre d'affaires — 14 derniers jours</h2><span class="small muted">${money(s.d30.revenue)} sur 30 jours · ${s.d30.count} commandes · <a class="link" href="/admin/chiffre-affaires">par mois et par année</a></span></div>
+        <div class="panel-head"><h2>Chiffre d'affaires — 14 derniers jours</h2><span class="small muted">${money(s.d30.revenue)} sur 30 jours · ${s.d30.count} commandes · ${money(s.d30.tips)} de pourboires · <a class="link" href="/admin/chiffre-affaires">par mois et par année</a></span></div>
         <div class="panel-body">
           <div class="bars" role="img" aria-label="Chiffre d'affaires quotidien sur 14 jours">
             ${s.series.map((d, i) => html`<div class="bar ${i === s.series.length - 1 ? 'today' : ''}" title="${d.label} : ${money(d.total)} (${d.count} commande${d.count > 1 ? 's' : ''})">
@@ -52,7 +52,7 @@ export function dashboardPage(ctx, s) {
     </div>
     <div class="panels">
       <section class="panel">
-        <div class="panel-head"><h2>Paiements · 30 jours</h2></div>
+        <div class="panel-head"><h2>Paiements · 30 jours</h2><span class="small muted">${money(s.d30.tips)} de pourboires</span></div>
         <div class="panel-body">
           <dl class="kv">
             <dt>Carte bancaire</dt><dd class="num"><strong>${money(s.pay.card)}</strong> <span class="muted small">· ${s.pay.cardCount} paiements</span></dd>
@@ -110,6 +110,38 @@ export function ordersPage(ctx, { orders, view, q, counts }) {
   return adminLayout(ctx, { title: 'Commandes', active: 'orders', body });
 }
 
+export function clientsPage(ctx, { clients, q = '' }) {
+  const body = html`
+  <div class="pro-head"><div><h1 class="h1">Clients</h1><p>Comptes clients, commandes et retours après livraison.</p></div></div>
+  <form class="filters" method="get" action="/admin/clients"><div class="search">${icon('search')}<label class="sr-only" for="client-q">Rechercher un client</label><input class="input" id="client-q" name="q" value="${q}" placeholder="Nom, e-mail ou téléphone"></div></form>
+  <section class="panel"><div class="table-wrap"><table class="table">
+    <thead><tr><th>Client</th><th class="r">Commandes</th><th class="r">Avis</th><th>Note moyenne</th></tr></thead>
+    <tbody>${clients.map((c) => html`<tr>
+      <td><a class="strong" href="/admin/clients/${c.id}" style="text-decoration:none">${c.first_name} ${c.last_name}</a><div class="small muted">${c.email}${c.phone ? ` · ${c.phone}` : ''}</div></td>
+      <td class="r">${c.order_count}</td><td class="r">${c.review_count}</td>
+      <td>${c.average_rating == null ? html`<span class="muted">—</span>` : html`${ratingStars(Math.round(c.average_rating))} <span class="small muted">${Number(c.average_rating).toFixed(1)}/5</span>`}</td>
+    </tr>`)}</tbody>
+  </table></div>${!clients.length ? html`<p class="muted" style="padding:20px">Aucun client trouvé.</p>` : ''}</section>`;
+  return adminLayout(ctx, { title: 'Clients', active: 'clients', body });
+}
+
+export function clientPage(ctx, { client, orders, reviews }) {
+  const body = html`
+  <div class="pro-head"><div><a class="small muted" href="/admin/clients" style="text-decoration:none">${icon('back')} Clients</a><h1 class="h1 mt-8">${client.first_name} ${client.last_name}</h1><p>${client.email}${client.phone ? ` · ${client.phone}` : ''}</p></div></div>
+  <div class="order-layout"><div class="panels">
+    <section class="panel"><div class="panel-head"><h2>Commandes (${orders.length})</h2></div>
+      ${orders.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Commande</th><th>Date</th><th>Statut</th><th class="r">Total</th><th>Avis</th></tr></thead><tbody>
+        ${orders.map((o) => html`<tr><td><a class="strong" href="/admin/commandes/${o.id}">${o.number}</a></td><td class="small">${fmtDateTime(o.created_at)}</td><td>${statusBadge(o.status)}</td><td class="r">${money(o.total_cents)}</td><td>${o.review_rating ? ratingStars(o.review_rating) : html`<span class="muted">—</span>`}</td></tr>`)}
+      </tbody></table></div>` : html`<p class="muted" style="padding:20px">Aucune commande liée à ce compte.</p>`}
+    </section>
+  </div><div class="panels">
+    <section class="panel"><div class="panel-head"><h2>Avis (${reviews.length})</h2></div><div class="panel-body stack" style="--s:16px">
+      ${reviews.length ? reviews.map((r) => html`<article><div class="row between wrap-row"><a class="strong" href="/admin/commandes/${r.order_id}">${r.number}</a>${ratingStars(r.rating)}</div><p class="small muted mt-8">${fmtDateTime(r.created_at)}</p>${r.comment ? html`<p class="mt-8">${r.comment}</p>` : html`<p class="small muted mt-8">Aucun commentaire.</p>`}<hr class="sep"></article>`) : html`<p class="muted">Ce client n’a pas encore laissé d’avis.</p>`}
+    </div></section>
+  </div></div>`;
+  return adminLayout(ctx, { title: `${client.first_name} ${client.last_name}`, active: 'clients', body });
+}
+
 export function orderDetailPage(ctx, { order: o, items, events, drivers, payments }) {
   const next = allowedNext(o).filter((s) => s !== 'cancelled');
   const primary = next[0];
@@ -139,7 +171,8 @@ export function orderDetailPage(ctx, { order: o, items, events, drivers, payment
           <tbody>${items.map((i) => html`<tr><td><span class="strong">${i.name}</span> <span class="muted small">${i.unit}</span></td><td class="r strong">${i.quantity}</td><td class="r">${money(i.unit_price_cents)}</td><td class="r">${money(i.line_total_cents)}</td></tr>`)}</tbody>
           <tfoot>
             <tr><td colspan="3" class="r muted">Sous-total</td><td class="r">${money(o.subtotal_cents)}</td></tr>
-            <tr><td colspan="3" class="r muted">Livraison (${o.zone_name})</td><td class="r">${money(o.delivery_fee_cents)}</td></tr>
+            <tr><td colspan="3" class="r muted">Livraison (${o.zone_name})</td><td class="r">${o.delivery_fee_cents ? money(o.delivery_fee_cents) : o.signup_free_delivery ? 'Offerte · bienvenue' : 'Offerte'}</td></tr>
+            ${o.tip_cents ? html`<tr><td colspan="3" class="r muted">Pourboire</td><td class="r">${money(o.tip_cents)}</td></tr>` : ''}
             <tr><td colspan="3" class="r strong">Total</td><td class="r strong">${money(o.total_cents)}</td></tr>
             ${refunded ? html`<tr><td colspan="3" class="r" style="color:var(--danger)">Remboursé</td><td class="r" style="color:var(--danger)">− ${money(refunded)}</td></tr>` : ''}
           </tfoot>
@@ -181,6 +214,7 @@ export function orderDetailPage(ctx, { order: o, items, events, drivers, payment
       <section class="panel"><div class="panel-body">
         <p class="label">Client</p>
         <p class="mt-8"><strong>${o.first_name} ${o.last_name}</strong><br><a class="link" href="tel:${o.phone.replace(/\s/g, '')}">${o.phone}</a><br><span class="small muted">${o.email}</span></p>
+        ${o.user_id ? html`<a class="btn btn-ghost btn-sm mt-16" href="/admin/clients/${o.user_id}">Voir la fiche client</a>` : html`<p class="small muted mt-16">Commande passée sans compte client.</p>`}
         <hr class="sep">
         <p class="label">Livraison · ${o.zone_name}</p>
         <p class="mt-8">${o.address_line1}${o.address_line2 ? html`<br>${o.address_line2}` : ''}<br>${o.postal_code} ${o.city}</p>
@@ -529,10 +563,10 @@ export function revenuePage(ctx, { report: r, years }) {
 
   <div class="kpis">
     <div class="kpi accent"><span class="k-label">CA ${r.year}${r.isCurrent ? ' (depuis le 1er janvier)' : ''}</span><span class="k-value">${money(t.net)}</span>
-      <span class="k-sub">${evo === null ? `${r.year - 1} : aucune vente` : html`${evo >= 0 ? '+' : ''}${evo} % par rapport à ${r.year - 1}${r.isCurrent ? ' à la même date' : ''} (${money(r.prev.net)})`}</span></div>
+      <span class="k-sub">Hors pourboires · ${money(t.tips)} de pourboires · ${evo === null ? `${r.year - 1} : aucune vente` : html`${evo >= 0 ? '+' : ''}${evo} % par rapport à ${r.year - 1}${r.isCurrent ? ' à la même date' : ''} (${money(r.prev.net)})`}</span></div>
     <div class="kpi"><span class="k-label">Commandes</span><span class="k-value">${t.count}</span><span class="k-sub">panier moyen ${money(t.avg)}</span></div>
     <div class="kpi"><span class="k-label">Produits / livraison</span><span class="k-value">${money(t.products)}</span><span class="k-sub">+ ${money(t.delivery)} de frais de livraison</span></div>
-    <div class="kpi cash"><span class="k-label">Part payée par carte</span><span class="k-value">${pct(t.card, t.gross)}</span><span class="k-sub">carte ${money(t.card)} · espèces ${money(t.cash)}${t.refunded ? ` · remboursé ${money(t.refunded)}` : ''}</span></div>
+    <div class="kpi cash"><span class="k-label">Encaissements par moyen</span><span class="k-value">${pct(t.card, t.gross)} par carte</span><span class="k-sub">carte ${money(t.card)} · espèces ${money(t.cash)}${t.refunded ? ` · remboursé ${money(t.refunded)}` : ''}</span></div>
   </div>
 
   <section class="panel mt-16">
@@ -543,9 +577,9 @@ export function revenuePage(ctx, { report: r, years }) {
       </div>
     </div>
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Mois</th><th class="r">Commandes</th><th class="r">CA net TTC</th><th class="r">dont livraison</th><th class="r">Carte</th><th class="r">Espèces</th><th class="r">Remboursé</th><th class="r">Panier moyen</th></tr></thead>
-      <tbody>${r.months.map((m) => html`<tr${raw(m.future ? ' style="opacity:.45"' : '')}><td class="strong">${m.label}</td><td class="r">${m.count}</td><td class="r strong">${money(m.net)}</td><td class="r">${money(m.delivery)}</td><td class="r">${money(m.card)}</td><td class="r">${money(m.cash)}</td><td class="r">${m.refunded ? money(m.refunded) : '—'}</td><td class="r">${m.count ? money(m.avg) : '—'}</td></tr>`)}
-        <tr style="border-top:2px solid var(--line)"><td class="strong">Total ${r.year}</td><td class="r strong">${t.count}</td><td class="r strong">${money(t.net)}</td><td class="r">${money(t.delivery)}</td><td class="r">${money(t.card)}</td><td class="r">${money(t.cash)}</td><td class="r">${t.refunded ? money(t.refunded) : '—'}</td><td class="r">${t.count ? money(t.avg) : '—'}</td></tr>
+      <thead><tr><th>Mois</th><th class="r">Commandes</th><th class="r">CA net TTC</th><th class="r">dont livraison</th><th class="r">Pourboires</th><th class="r">Carte encaissée</th><th class="r">Espèces encaissées</th><th class="r">Remboursé</th><th class="r">Panier moyen</th></tr></thead>
+      <tbody>${r.months.map((m) => html`<tr${raw(m.future ? ' style="opacity:.45"' : '')}><td class="strong">${m.label}</td><td class="r">${m.count}</td><td class="r strong">${money(m.net)}</td><td class="r">${money(m.delivery)}</td><td class="r">${money(m.tips)}</td><td class="r">${money(m.card)}</td><td class="r">${money(m.cash)}</td><td class="r">${m.refunded ? money(m.refunded) : '—'}</td><td class="r">${m.count ? money(m.avg) : '—'}</td></tr>`)}
+        <tr style="border-top:2px solid var(--line)"><td class="strong">Total ${r.year}</td><td class="r strong">${t.count}</td><td class="r strong">${money(t.net)}</td><td class="r">${money(t.delivery)}</td><td class="r">${money(t.tips)}</td><td class="r">${money(t.card)}</td><td class="r">${money(t.cash)}</td><td class="r">${t.refunded ? money(t.refunded) : '—'}</td><td class="r">${t.count ? money(t.avg) : '—'}</td></tr>
       </tbody></table></div>
   </section>
   <p class="small muted mt-16">Toutes les commandes restent enregistrées dans la base : les années précédentes restent consultables avec le sélecteur. L'export CSV liste chaque commande de l'année pour votre comptable.</p>`;

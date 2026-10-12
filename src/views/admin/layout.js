@@ -9,6 +9,7 @@ export function adminLayout(ctx, { title, active, body }) {
   const nav = [
     ['/admin', 'Tableau de bord', 'grid', 'dash'],
     ['/admin/commandes', 'Commandes', 'receipt', 'orders', pending],
+    ['/admin/clients', 'Clients', 'user', 'clients'],
     ['/admin/chiffre-affaires', "Chiffre d'affaires", 'cash', 'revenue'],
     ['/admin/statistiques', 'Statistiques', 'users', 'stats'],
     ['/admin/produits', 'Produits', 'box', 'products'],

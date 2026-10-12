@@ -42,6 +42,10 @@ const P = {
   refresh: '<path d="M19.5 11A7.5 7.5 0 0 0 6 6.8L4.5 8.5M4.5 13A7.5 7.5 0 0 0 18 17.2l1.5-1.7"/><path d="M4.5 4v4.5H9M19.5 20v-4.5H15"/>',
 };
 export const icon = (name, cls = '') => raw(`<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[name] || ''}</svg>`);
+export const ratingStars = (value) => {
+  const n = Math.round(Math.max(0, Math.min(5, Number(value) || 0)));
+  return html`<span class="review-stars" role="img" aria-label="${n} étoile${n > 1 ? 's' : ''} sur 5">${'★'.repeat(n)}<span class="muted">${'☆'.repeat(5 - n)}</span></span>`;
+};
 
 /** Monogramme : une étiquette à coins entaillés, « MG » en romain. */
 export const logoMark = raw(`<svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true">

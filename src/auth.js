@@ -49,7 +49,8 @@ export function endSession(req, res) {
 export function currentUser(req) {
   const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (!token || token.length > 100) return null;
-  const row = one(`SELECT u.id, u.email, u.role, u.first_name, u.last_name, u.phone, u.stripe_customer_id, u.is_active, s.expires_at
+  const row = one(`SELECT u.id, u.email, u.role, u.first_name, u.last_name, u.phone, u.stripe_customer_id, u.is_active,
+                          u.welcome_delivery_eligible, u.welcome_delivery_order_id, s.expires_at
                    FROM sessions s JOIN users u ON u.id = s.user_id
                    WHERE s.id = ? AND u.deleted_at IS NULL`, tokenId(token));
   if (!row || row.expires_at < nowIso() || !row.is_active) return null;

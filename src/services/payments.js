@@ -46,6 +46,7 @@ export async function startCheckout(order, user) {
   const items = orderItems(order.id);
   const line_items = items.map((i) => ({ quantity: i.quantity, price_data: { currency: 'eur', unit_amount: i.unit_price_cents, product_data: { name: `${i.name}${i.unit ? ` — ${i.unit}` : ''}` } } }));
   if (order.delivery_fee_cents > 0) line_items.push({ quantity: 1, price_data: { currency: 'eur', unit_amount: order.delivery_fee_cents, product_data: { name: `Livraison — ${order.zone_name}` } } });
+  if (order.tip_cents > 0) line_items.push({ quantity: 1, price_data: { currency: 'eur', unit_amount: order.tip_cents, product_data: { name: 'Pourboire' } } });
   const customer = await ensureCustomer(user).catch(() => null);
   const params = {
     mode: 'payment', locale: 'fr', client_reference_id: String(order.id),

@@ -5,10 +5,10 @@ import { stripeEnabled } from '../../config.js';
 
 const json = (v) => raw(JSON.stringify(v).replace(/</g, '\\u003c'));
 
-export function checkoutPage(ctx, { days, zones, addresses, state }) {
+export function checkoutPage(ctx, { days, zones, addresses, state, welcomeDeliveryFree = false }) {
   const u = ctx.user && ctx.user.role === 'customer' ? ctx.user : null;
   const def = addresses.find((a) => a.is_default) || addresses[0] || {};
-  const zoneData = zones.map((z) => ({ name: z.name, codes: z.postal_codes.split(/[\s,;]+/), fee: z.fee_cents, min: 0, free: z.free_over_cents, eta: z.eta_minutes }));
+  const zoneData = zones.map((z) => ({ name: z.name, codes: z.postal_codes.split(/[\s,;]+/), fee: welcomeDeliveryFree ? 0 : z.fee_cents, min: 0, free: z.free_over_cents, eta: z.eta_minutes, welcome_free: welcomeDeliveryFree }));
 
   const body = html`
 <div class="wrap">
@@ -16,6 +16,8 @@ export function checkoutPage(ctx, { days, zones, addresses, state }) {
         <h1 class="h1">Finaliser la commande</h1>
         ${!ctx.user ? html`<a class="link small" href="/connexion?suite=/commande">J'ai déjà un compte</a>` : ''}
       </div>
+  ${welcomeDeliveryFree ? html`<div class="notice notice-success mt-16">${icon('check')}<span><strong>Votre première livraison est offerte.</strong> L’offre est appliquée automatiquement à cette commande.</span></div>`
+    : !u ? html`<div class="notice mt-16">${icon('bike')}<span>Créez un compte pour profiter de votre première livraison offerte. <a class="link" href="/inscription?suite=/commande">Créer mon compte</a></span></div>` : ''}
   <div class="checkout" data-checkout>
     <form class="co-form" data-checkout-form novalidate>
 
@@ -60,7 +62,20 @@ export function checkoutPage(ctx, { days, zones, addresses, state }) {
       </section>
 
       <section class="co-section" aria-labelledby="s4">
-        <div class="co-title"><span class="n">4</span><h2 id="s4">Paiement</h2></div>
+        <div class="co-title"><span class="n">4</span><h2 id="s4">Pourboire et paiement</h2></div>
+        <div class="field tip-field">
+          <label for="tip-choice">Ajouter un pourboire <span class="muted" style="font-weight:400">(facultatif)</span></label>
+          <select class="select" id="tip-choice" data-tip-choice>
+            <option value="0">Aucun</option><option value="100">1 €</option><option value="200">2 €</option><option value="500">5 €</option><option value="custom">Autre montant</option>
+          </select>
+          <div data-tip-custom-wrap hidden class="mt-8">
+            <label class="sr-only" for="tip-custom">Montant du pourboire en euros</label>
+            <input class="input" id="tip-custom" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="" placeholder="Montant en euros" data-tip-custom>
+            <span class="hint">Jusqu’à 100 €.</span>
+          </div>
+          <input type="hidden" name="tip_cents" value="0" data-tip-cents>
+          <p class="error-text mt-8" data-err="tip_cents" hidden></p>
+        </div>
         <div class="pay-options" role="radiogroup" aria-label="Mode de paiement">
           <div class="pay"><input type="radio" name="payment_method" id="pm-card" value="card" checked><label for="pm-card"><span class="t">Carte bancaire</span><span class="brands"><span>CB</span><span>VISA</span><span>MC</span></span><span class="d">Paiement sécurisé sur la page Stripe. Vos données bancaires ne sont jamais stockées par Maison Green.${stripeEnabled() ? '' : ' (Mode démo : aucun débit réel)'}</span></label></div>
         </div>

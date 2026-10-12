@@ -86,6 +86,9 @@ export function createOrder(input, user) {
   const quote = quoteCart(input.items);
   if (!quote.lines.length) throw new HttpError(422, 'Votre panier est vide.', { errors });
   if (quote.issues.length) errors.cart = quote.issues.map((i) => i.message).join(' ');
+  const tipValue = String(input.tip_cents ?? '0');
+  const tipCents = /^\d+$/.test(tipValue) ? Number(tipValue) : NaN;
+  if (!Number.isSafeInteger(tipCents) || tipCents < 0 || tipCents > 10000) errors.tip_cents = 'Choisissez un pourboire compris entre 0 € et 100 €.';
   const adultOk = input.adult_ok === true || input.adult_ok === 'on' || input.adult_ok === '1' || input.adult_ok === 'true';
   if (quote.adult && !adultOk) errors.adult_ok = 'Votre panier contient des produits réservés aux personnes majeures : merci de confirmer que vous avez 18 ans ou plus.';
 
@@ -98,11 +101,14 @@ export function createOrder(input, user) {
 
   if (Object.keys(errors).length) throw new HttpError(422, 'Certaines informations sont à corriger.', { errors, data });
 
-  const fee = deliveryFee(zone, quote.subtotal);
-  const total = quote.subtotal + fee;
   const token = crypto.randomBytes(18).toString('base64url');
 
   const order = tx(() => {
+    const account = user ? one('SELECT welcome_delivery_eligible, welcome_delivery_order_id FROM users WHERE id = ? AND role = \'customer\'', user.id) : null;
+    const signupFreeDelivery = Boolean(account?.welcome_delivery_eligible && !account.welcome_delivery_order_id);
+    const fee = signupFreeDelivery ? 0 : deliveryFee(zone, quote.subtotal);
+    const total = quote.subtotal + fee + tipCents;
+
     // Réservation du stock : échoue proprement si un autre client vient de prendre le dernier article.
     for (const l of quote.lines) {
       const r = run('UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ? AND stock >= ?', l.quantity, nowIso(), l.id, l.quantity);
@@ -110,12 +116,16 @@ export function createOrder(input, user) {
     }
     const r = run(`INSERT INTO orders (number, tracking_token, user_id, status, first_name, last_name, email, phone, address_line1, address_line2,
                      postal_code, city, instructions, zone_id, zone_name, slot_date, slot_start, slot_end, subtotal_cents, delivery_fee_cents,
-                     total_cents, payment_method, payment_status, cash_to_collect_cents)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending', 0)`,
+                     tip_cents, signup_free_delivery, total_cents, payment_method, payment_status, cash_to_collect_cents)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending', 0)`,
       `TMP-${token}`, token, user?.id ?? null, 'awaiting_payment', data.first_name, data.last_name, data.email, data.phone,
       data.address_line1, data.address_line2, data.postal_code, data.city, data.instructions, zone.id, zone.name, slot.date, slot.start, slot.end,
-      quote.subtotal, fee, total);
+      quote.subtotal, fee, tipCents, signupFreeDelivery ? 1 : 0, total);
     const id = Number(r.lastInsertRowid);
+    if (signupFreeDelivery) {
+      const claimed = run('UPDATE users SET welcome_delivery_order_id = ? WHERE id = ? AND welcome_delivery_eligible = 1 AND welcome_delivery_order_id IS NULL', id, user.id);
+      if (claimed.changes !== 1) throw new HttpError(409, 'L’offre de bienvenue vient d’être utilisée. Vérifiez à nouveau votre commande.');
+    }
     run('UPDATE orders SET number = ?, age_check = ? WHERE id = ?', `MG-${1000 + id}`, quote.adult ? 1 : 0, id);
     for (const l of quote.lines) {
       run('INSERT INTO order_items (order_id, product_id, name, unit, unit_price_cents, quantity, line_total_cents) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -271,6 +281,9 @@ export async function cancelOrder(orderId, actor, reason = '', { silent = false 
     const payStatus = ['paid', 'partially_refunded'].includes(o.payment_status) ? o.payment_status : (o.payment_method === 'cash' ? 'cancelled' : (o.payment_status === 'failed' ? 'failed' : 'cancelled'));
     run('UPDATE orders SET status = ?, payment_status = ?, cash_to_collect_cents = 0, cancel_reason = ?, updated_at = ? WHERE id = ?',
       'cancelled', payStatus, reason || null, nowIso(), orderId);
+    if (o.signup_free_delivery && o.user_id) {
+      run('UPDATE users SET welcome_delivery_order_id = NULL WHERE id = ? AND welcome_delivery_order_id = ?', o.user_id, o.id);
+    }
     addEvent(orderId, 'cancelled', reason ? `Annulée : ${reason}` : 'Commande annulée', actor?.id);
     return getOrder(orderId);
   });

@@ -9,13 +9,21 @@ const monthStart = (y, m) => parisToUtc(`${y}-${String(m).padStart(2, '0')}-01`,
 const next = (y, m) => (m === 12 ? [y + 1, 1] : [y, m + 1]);
 
 function period(from, to) {
-  const r = one(`SELECT COUNT(*) AS count, COALESCE(SUM(o.total_cents),0) AS gross, COALESCE(SUM(o.delivery_fee_cents),0) AS delivery,
+  const r = one(`WITH settled AS (
+      SELECT o.*, (SELECT COALESCE(SUM(p.refunded_cents),0) FROM payments p WHERE p.order_id = o.id) AS refund_total
+      FROM orders o WHERE ${VALID} AND o.created_at >= ? AND o.created_at < ?
+    )
+    SELECT COUNT(*) AS count, COALESCE(SUM(total_cents),0) AS gross,
+      COALESCE(SUM(MAX(0, total_cents - refund_total)),0) AS collected,
+      COALESCE(SUM(MIN(tip_cents, MAX(0, total_cents - refund_total))),0) AS tips,
+      COALESCE(SUM(MIN(delivery_fee_cents, MAX(0, total_cents - refund_total - MIN(tip_cents, MAX(0, total_cents - refund_total))))),0) AS delivery,
       COALESCE(SUM(CASE WHEN o.payment_method = 'card' THEN o.total_cents END),0) AS card,
       COALESCE(SUM(CASE WHEN o.payment_method = 'cash' THEN o.total_cents END),0) AS cash,
-      COALESCE(SUM((SELECT COALESCE(SUM(p.refunded_cents),0) FROM payments p WHERE p.order_id = o.id)),0) AS refunded
-    FROM orders o WHERE ${VALID} AND o.created_at >= ? AND o.created_at < ?`, from, to);
-  const net = r.gross - r.refunded;
-  return { ...r, net, products: net - r.delivery, avg: r.count ? Math.round(net / r.count) : 0 };
+      COALESCE(SUM(refund_total),0) AS refunded
+    FROM settled o`, from, to);
+  const collected = r.collected;
+  const net = collected - r.tips;
+  return { ...r, collected, net, products: net - r.delivery, avg: r.count ? Math.round(net / r.count) : 0 };
 }
 
 /** Années pour lesquelles il existe au moins une commande (+ l'année en cours). */
@@ -47,7 +55,7 @@ export function yearReport(year) {
 /** Détail des commandes d'une année (export pour la comptabilité). */
 export function yearOrders(year) {
   return all(`SELECT o.number, o.created_at, o.status, o.first_name, o.last_name, o.payment_method, o.payment_status,
-      o.subtotal_cents, o.delivery_fee_cents, o.total_cents,
+      o.subtotal_cents, o.delivery_fee_cents, o.tip_cents, o.total_cents,
       (SELECT COALESCE(SUM(p.refunded_cents),0) FROM payments p WHERE p.order_id = o.id) AS refunded_cents
     FROM orders o WHERE ${VALID} AND o.created_at >= ? AND o.created_at < ? ORDER BY o.created_at`, monthStart(year, 1), monthStart(year + 1, 1))
     .map((o) => ({ ...o, paris: parisNow(new Date(o.created_at)) }));

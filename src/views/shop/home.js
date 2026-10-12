@@ -7,8 +7,12 @@ export function homePage(ctx, { categories, featured, zones, hours, state, shelf
   const todayWd = parisNow().weekday;
   const minFee = zones.length ? Math.min(...zones.map((z) => z.fee_cents)) : 0;
   const minEta = zones.length ? Math.min(...zones.map((z) => z.eta_minutes)) : 45;
+  const showSignupOffer = !ctx.user || ctx.user.role !== 'customer';
 
   const body = html`
+${showSignupOffer ? html`<aside class="welcome-offer" aria-label="Offre de bienvenue">
+  <div class="wrap"><span class="welcome-offer-copy"><strong>Votre première livraison est offerte</strong><span>en créant votre compte</span></span><a href="/inscription" class="welcome-offer-link">Créer un compte ${icon('arrow')}</a></div>
+</aside>` : ''}
 <section class="hero">
   <div class="wrap hero-grid">
     <div class="hero-copy">
