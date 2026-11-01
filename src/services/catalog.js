@@ -29,10 +29,30 @@ export const categories = ({ withCounts = false, includeInactive = false } = {})
 const BASE = `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.tone AS tone, c.age_restricted AS age_restricted, c.legal_notice AS legal_notice
               FROM products p LEFT JOIN categories c ON c.id = p.category_id`;
 
+/**
+ * Rayon CBD : d'abord les résines, puis les fleurs, puis les fleurs à infuser, et en bas les accessoires
+ * (briquets, feuilles…). Le type est lu dans la description (« Résine de CBD… », « Fleur de CBD… »).
+ */
+const cbdRank = (p) => {
+  const d = norm(p.description || '');
+  if (/resine/.test(d)) return 0;
+  if (/infuser/.test(d)) return 2;
+  if (/fleur/.test(d)) return 1;
+  return 3;
+};
+function sortCbd(rows) {
+  const firstIdx = new Map();
+  rows.forEach((p, i) => { if (!firstIdx.has(p.category_id)) firstIdx.set(p.category_id, i); });
+  const isCbd = (p) => /cbd/.test(norm(p.category_name || p.category_slug || ''));
+  return rows.map((p, i) => ({ p, i, c: firstIdx.get(p.category_id), r: isCbd(p) ? cbdRank(p) : 0 }))
+    .sort((a, b) => a.c - b.c || a.r - b.r || a.i - b.i).map((x) => x.p);
+}
+
 /** Produits visibles côté client (actifs, catégorie active). */
 export function shopProducts({ q = '', category = '' } = {}) {
   let rows = all(`${BASE} WHERE p.deleted_at IS NULL AND p.is_active = 1 AND (c.is_active = 1 OR c.id IS NULL)
                   ORDER BY c.position, p.is_featured DESC, p.name`);
+  rows = sortCbd(rows);
   if (category) rows = rows.filter((p) => p.category_slug === category);
   if (q) {
     const terms = norm(q).split(/\s+/).filter(Boolean);
