@@ -549,7 +549,7 @@ test('variantes : une seule fiche « Nom » avec le choix des formats', async ()
   assert.match(shop, /CBD test <span class="n">1<\/span>/);
   const slug = /href="\/produit\/([^"]+)"/.exec(shop)[1];
   const page = (await c.get(`/produit/${slug}`)).text;
-  assert.match(page, /<h1 class="h1">Amnesia test<\/h1>/);
+  assert.match(page, /<h1 class="h1">Amnesia test(<span class="stars"[^>]*>★+<\/span>)?<\/h1>/);
   assert.equal((page.match(/class="variant /g) || []).length + (page.match(/class="variant"/g) || []).length, 3);
   assert.match(page, /aria-current="true"[\s\S]{0,200}1 g/); assert.match(page, /épuisé/);
   const five = /href="\/produit\/([^"]+)"[^>]*>\s*<span class="v-label">5 g/.exec(page)[1];
