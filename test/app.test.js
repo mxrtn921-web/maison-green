@@ -545,7 +545,7 @@ test('variantes : une seule fiche « Nom » avec le choix des formats', async ()
   const c = client();
   const shop = (await c.get('/boutique?categorie=cbd-test')).text;
   assert.equal((shop.match(/class="product-name"/g) || []).length, 1, 'une seule carte pour les 3 formats');
-  assert.match(shop, /Amnesia test<\/a>/); assert.match(shop, /1 g · 5 g · 10 g/); assert.match(shop, /dès<\/span> 7,00/);
+  assert.match(shop, /Amnesia test(<span class="stars"[^>]*>★+<\/span>)?<\/a>/); assert.match(shop, /1 g · 5 g · 10 g/); assert.match(shop, /dès<\/span> 7,00/);
   assert.match(shop, /CBD test <span class="n">1<\/span>/);
   const slug = /href="\/produit\/([^"]+)"/.exec(shop)[1];
   const page = (await c.get(`/produit/${slug}`)).text;
