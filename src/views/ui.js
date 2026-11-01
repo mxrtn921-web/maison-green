@@ -74,7 +74,8 @@ export function productTag(p, { lazy = true } = {}) {
 
 
 /** Variétés CBD « puissantes » : 3 petites étoiles dorées à côté du nom. */
-const STRONG_CBD = ['gold moroco', 'gold maroc', 'harlequin', 'red cherry', 'strawberry', 'lemon aze', 'lemon haze', 'candy melon', 'kaly kush', 'kali kush'];
+const STRONG_CBD = ['gold moroco', 'gold maroco', 'gold maroc', 'harlequin', 'red cherry', 'strawberry', 'lemon aze', 'lemon haze', 'candy melon', 'kaly kush', 'kali kush',
+  'ketama', 'inf gorilla', 'inf apple fritter', 'gelato', '3x filtre', 'amnesia'];
 const flat = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 export const isStrongCbd = (p) => {
   const n = flat(p.group_name || p.name);
@@ -82,7 +83,7 @@ export const isStrongCbd = (p) => {
   return cat.includes('cbd') && STRONG_CBD.some((k) => n === k || n.startsWith(k + ' '));
 };
 export const stars = (p) => (isStrongCbd(p)
-  ? raw('<span class="stars" role="img" aria-label="Puissant : 3 étoiles">\u2605\u2605\u2605</span>') : '');
+  ? raw('<span class="stars" role="img" aria-label="Concentration élevée en CBD : 3 étoiles">\u2605\u2605\u2605</span>') : '');
 
 export function productCard(p) {
   if (p.variant_count > 1) return variantCard(p);
