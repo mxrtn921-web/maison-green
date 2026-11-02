@@ -55,7 +55,6 @@ const RAYONS = [
   { name: 'Alcools', tone: 'butter', children: ['Whisky', 'Vodka', 'Rhum', 'Gin', 'Tequila', 'Cognac & calvados', 'Pastis', 'Liqueurs & apéritifs', 'Champagne & mousseux', 'Vin rouge', 'Vin blanc', 'Vin rosé', 'Bières', 'Canettes alcoolisées'] },
   { name: 'Boissons', tone: 'butter', children: ['Boissons énergisantes'] },
   { name: 'Épicerie', tone: 'sand', description: 'Épicerie salée et sucrée, snacks, confiseries, café et thé.', children: ['Épicerie salée', 'Épicerie sucrée', 'Biscuits apéro', 'Snacks salés', 'Confiseries', 'Café & thé', 'Produits frais'] },
-  { name: 'Vape', tone: 'stone', description: 'Puffs, cigarettes électroniques et e-liquides.', children: ['Puffs et cigarettes électroniques', 'E-liquides'] },
   { name: 'Hygiène & beauté', tone: 'stone', children: ['Hygiène'] },
   { name: 'Maison', tone: 'stone', description: 'Entretien et animalerie.', children: ['Entretien', 'Animalerie'] },
 ];
