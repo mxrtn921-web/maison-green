@@ -12,8 +12,16 @@ const categories = (opts = {}) => {
   const cats = rawCategories(opts);
   if (!opts.withCounts) return cats;
   const n = new Map(); for (const p of shopProducts()) n.set(p.category_id, (n.get(p.category_id) || 0) + 1);
-  return cats.map((c) => ({ ...c, product_count: n.get(c.id) || 0 }));
+  const ids = new Set(cats.map((c) => c.id));
+  // Sous-rayons : rattachés à leur rayon parent (s'il est visible). Le compteur du parent inclut ses sous-rayons.
+  const withCounts = cats.map((c) => ({ ...c, parent_id: c.parent_id && ids.has(c.parent_id) && c.parent_id !== c.id ? c.parent_id : null, own_count: n.get(c.id) || 0 }));
+  return withCounts.map((c) => {
+    const children = withCounts.filter((k) => k.parent_id === c.id && k.own_count > 0);
+    return { ...c, children, ids: [c.id, ...children.map((k) => k.id)], product_count: c.own_count + children.reduce((s, k) => s + k.own_count, 0) };
+  });
 };
+/** Rayons principaux (les sous-rayons apparaissent à l'intérieur de leur rayon). */
+const topCategories = () => categories({ withCounts: true }).filter((c) => !c.parent_id && c.product_count > 0);
 const hasWelcomeDelivery = (user) => Boolean(user?.role === 'customer' && user.welcome_delivery_eligible && !user.welcome_delivery_order_id);
 import { zones, zoneForPostal, deliveryFee, availableSlots, orderingState, hoursSummary } from '../services/delivery.js';
 import { createOrder, getOrderByToken, orderItems, orderEvents, markPaid, markPaymentFailed } from '../services/orders.js';
@@ -42,7 +50,7 @@ get('/sitemap.xml', (ctx) => {
 });
 
 get('/', (ctx) => {
-  const cats = categories({ withCounts: true }).filter((c) => c.product_count > 0);
+  const cats = topCategories();
   // Vitrine de l'accueil : uniquement l'épicerie « grand public » (pas de CBD, alcool, tabac ou vape), photos en priorité.
   const showcase = (p) => !p.age_restricted && !/cbd|alcool|vin|biere|puff|cigarette|liquide|vape|tabac/i.test(`${p.category_slug} ${p.category_name}`);
   const featuredAll = featuredProducts(200).filter(showcase);
@@ -62,8 +70,11 @@ get('/', (ctx) => {
 get('/boutique', (ctx) => {
   const q = String(ctx.query.get('q') || '').slice(0, 80);
   const category = String(ctx.query.get('categorie') || '').slice(0, 80);
-  const cats = categories({ withCounts: true }).filter((c) => c.product_count > 0);
-  sendHtml(ctx.res, catalogPage(ctx, { categories: cats, products: shopProducts({ q, category }), q, category, state: orderingState() }));
+  const allCats = categories({ withCounts: true }).filter((c) => c.product_count > 0);
+  const cats = allCats.filter((c) => !c.parent_id);
+  const current = allCats.find((c) => c.slug === category);
+  const parent = current?.parent_id ? allCats.find((c) => c.id === current.parent_id) : current;
+  sendHtml(ctx.res, catalogPage(ctx, { categories: cats, current, parent, products: shopProducts({ q, category }), q, category, state: orderingState() }));
 });
 
 get('/produit/:slug', (ctx) => {

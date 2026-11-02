@@ -367,6 +367,9 @@ p { margin: 0; }
 .chip[aria-current="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
 .chip .n { font-size: 12px; opacity: .6; font-variant-numeric: tabular-nums; }
 @media (min-width: 900px) { .shop-tools .wrap { grid-template-columns: 320px 1fr; align-items: center; gap: 20px; } .chips { margin: 0; padding: 0; } }
+.chips-sub { grid-column: 1 / -1; }
+.chips-sub .chip { height: 32px; padding: 0 12px; font-size: 13px; background: var(--stone); border-color: transparent; }
+.chips-sub .chip[aria-current="true"] { background: var(--ink); color: #fff; }
 .cat-block { padding-top: 36px; scroll-margin-top: 140px; }
 .cat-block h2 { margin-bottom: 20px; }
 .empty { text-align: center; padding: 64px 16px; }

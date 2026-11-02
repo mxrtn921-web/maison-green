@@ -378,6 +378,7 @@ export function categoriesPage(ctx, { categories, errors = {} }) {
     <input class="input" name="description" value="${c.description}" aria-label="Description" placeholder="Description" style="flex:3 1 220px">
     <select class="select" name="tone" aria-label="Teinte" style="flex:0 1 140px">${TONES.map(([k, l]) => html`<option value="${k}" ${sel(k, c.tone)}>${l}</option>`)}</select>
     <input class="input" name="position" type="number" value="${c.position}" aria-label="Ordre" style="flex:0 0 72px">
+    <select class="select" name="parent_id" aria-label="Rayon parent" title="Rayon parent : la catégorie s'affiche dans ce rayon" style="flex:0 1 180px"><option value="">Rayon principal</option>${categories.filter((k) => k.id !== c.id && !k.parent_id).map((k) => html`<option value="${k.id}" ${sel(k.id, c.parent_id)}>Dans : ${k.name}</option>`)}</select>
     <label class="switch" title="Visible"><input type="checkbox" name="is_active" ${chk(c.is_active)}><span class="small">${c.product_count} produits</span></label>
     <label class="switch" title="Réservé aux 18 ans et plus"><input type="checkbox" name="age_restricted" ${chk(c.age_restricted)}><span class="small">18+</span></label>
     <input class="input" name="legal_notice" value="${c.legal_notice || ''}" aria-label="Mention légale" placeholder="Mention légale (facultatif)" style="flex:1 1 100%">
@@ -385,7 +386,7 @@ export function categoriesPage(ctx, { categories, errors = {} }) {
     <button class="btn btn-quiet btn-sm" formaction="/admin/categories/${c.id}/supprimer" aria-label="Supprimer ${c.name}" data-confirm-click="Supprimer la catégorie « ${c.name} » ?">${icon('trash')}</button>
   </form>`;
   const body = html`
-  <div class="pro-head"><div><h1 class="h1">Catégories</h1><p>L'ordre et la teinte s'appliquent aux rayons et aux étiquettes produit de la boutique.</p></div></div>
+  <div class="pro-head"><div><h1 class="h1">Catégories</h1><p>L'ordre et la teinte s'appliquent aux rayons et aux étiquettes produit de la boutique. « Dans : … » range une catégorie à l'intérieur d'un rayon (ex. Whisky dans Alcools).</p></div></div>
   <section class="panel">${categories.map(row)}</section>
   <section class="panel"><div class="panel-head"><h2>Nouvelle catégorie</h2></div><div class="panel-body">
     <form class="inline-form" method="post" action="/admin/categories">

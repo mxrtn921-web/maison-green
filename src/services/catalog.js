@@ -48,12 +48,20 @@ function sortCbd(rows) {
     .sort((a, b) => a.c - b.c || a.r - b.r || a.i - b.i).map((x) => x.p);
 }
 
+/** Slugs des sous-rayons (actifs) d'un rayon parent. */
+export const subcategorySlugs = (slug) => all(`SELECT c.slug FROM categories c JOIN categories parent ON parent.id = c.parent_id
+  WHERE parent.slug = ? AND c.is_active = 1`, slug).map((c) => c.slug);
+
 /** Produits visibles côté client (actifs, catégorie active). */
 export function shopProducts({ q = '', category = '' } = {}) {
   let rows = all(`${BASE} WHERE p.deleted_at IS NULL AND p.is_active = 1 AND (c.is_active = 1 OR c.id IS NULL)
                   ORDER BY c.position, p.is_featured DESC, p.name`);
   rows = sortCbd(rows);
-  if (category) rows = rows.filter((p) => p.category_slug === category);
+  if (category) {
+    // Un rayon parent (ex. « Alcools ») montre aussi les produits de ses sous-rayons (Whisky, Vodka…).
+    const slugs = new Set([category, ...subcategorySlugs(category)]);
+    rows = rows.filter((p) => slugs.has(p.category_slug));
+  }
   if (q) {
     const terms = norm(q).split(/\s+/).filter(Boolean);
     rows = rows.filter((p) => { const hay = norm(`${p.name} ${p.description} ${p.category_name} ${p.origin}`); return terms.every((t) => hay.includes(t)); });

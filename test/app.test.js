@@ -557,6 +557,29 @@ test('variantes : une seule fiche « Nom » avec le choix des formats', async ()
   assert.match(p5, /pdp-price">30,00/);
 });
 
+test('rayons à sous-rayons : Whisky et Vodka rangés dans Alcools test', async () => {
+  const admin = client(); await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
+  const csv = 'nom;rayon;prix;format;stock\nWhisky A;Whisky test;20,00;70 cl;5\nVodka B;Vodka test;18,00;70 cl;5\nApéro C;Alcools test;9,00;70 cl;5\n';
+  const fd = new FormData(); fd.set('mode', 'maj'); fd.set('fichier', new Blob([csv], { type: 'text/csv' }), 'r.csv');
+  const prev = await admin.post('/admin/produits/import', { multipart: fd });
+  await admin.post('/admin/produits/import', { form: { token: /name="token" value="([^"]+)"/.exec(prev.text)[1] } });
+  const cats = (await admin.get('/admin/categories')).text;
+  const idOf = (n) => new RegExp(`action="/admin/categories/(\\d+)"[^>]*>(?:(?!</form>)[\\s\\S])*?value="${n}"`).exec(cats)[1];
+  const parent = idOf('Alcools test');
+  for (const n of ['Whisky test', 'Vodka test']) {
+    const r = await admin.post(`/admin/categories/${idOf(n)}`, { form: { name: n, description: '', tone: 'butter', position: '50', is_active: 'on', legal_notice: '', parent_id: parent } });
+    assert.equal(r.status, 303);
+  }
+  const c = client();
+  const all = (await c.get('/boutique')).text;
+  assert.match(all, /categorie=alcools-test"[^>]*>Alcools test <span class="n">3</); assert.doesNotMatch(all, /class="chip" href="\/boutique\?categorie=whisky-test"/);
+  const page = (await c.get('/boutique?categorie=alcools-test')).text;
+  assert.match(page, /chips-sub/); assert.match(page, /Whisky A/); assert.match(page, /Vodka B/); assert.match(page, /Apéro C/);
+  assert.match(page, /<h2 class="h2">Whisky test<\/h2>/);
+  const sub = (await c.get('/boutique?categorie=whisky-test')).text;
+  assert.match(sub, /Whisky A/); assert.doesNotMatch(sub, /Vodka B/); assert.match(sub, /chips-sub/);
+});
+
 test('qualité du site : CGU, sitemap, robots, compression, favicon, anti-spam, statistiques anonymes', async () => {
   const c = client();
   // pages légales et référencement

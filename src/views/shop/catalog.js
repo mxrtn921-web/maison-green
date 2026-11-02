@@ -3,16 +3,19 @@ import { icon, productCard, productTag, addControl, stars } from '../ui.js';
 import { shopLayout } from './layout.js';
 import { baseName, variantLabel } from '../../services/catalog.js';
 
-export function catalogPage(ctx, { categories, products, q, category, state }) {
-  const current = categories.find((c) => c.slug === category);
+export function catalogPage(ctx, { categories, products, q, category, state, current = categories.find((c) => c.slug === category), parent = current }) {
   const total = categories.reduce((s, c) => s + c.product_count, 0);
-  const grouped = !q && !category;
+  const subs = parent?.children || [];
+  // Page « Tout » : un bloc par rayon. Page d'un rayon parent (ex. Alcools) : un bloc par sous-rayon (Whisky, Vodka…).
+  const blocks = !q && !category ? categories : (!q && current && current === parent && subs.length ? [{ ...current, ids: [current.id] }, ...subs.map((k) => ({ ...k, ids: [k.id] }))] : null);
+  const qs = q ? `&q=${encodeURIComponent(q)}` : '';
 
   const results = !products.length
     ? html`<div class="empty"><h2 class="h2">Aucun produit trouvé</h2><p>${q ? `Rien ne correspond à « ${q} ». Essayez un autre mot, ou parcourez les rayons.` : 'Ce rayon est vide pour le moment.'}</p><a class="btn btn-ghost" href="/boutique">Voir tous les produits</a></div>`
-    : grouped
-      ? categories.map((c) => {
-        const items = products.filter((p) => p.category_id === c.id);
+    : blocks
+      ? blocks.map((c) => {
+        const ids = new Set(c.ids || [c.id]);
+        const items = products.filter((p) => ids.has(p.category_id));
         return items.length ? html`<section class="cat-block" id="${c.slug}"><h2 class="h2">${c.name}</h2><div class="product-grid">${items.map(productCard)}</div></section>` : '';
       })
       : html`<div class="cat-block">${q ? html`<p class="muted" style="margin-bottom:20px">${products.length} résultat${products.length > 1 ? 's' : ''} pour « ${q} »</p>` : ''}<div class="product-grid">${products.map(productCard)}</div></div>`;
@@ -33,8 +36,12 @@ export function catalogPage(ctx, { categories, products, q, category, state }) {
     </form>
     <nav class="chips" aria-label="Rayons">
       <a class="chip" href="/boutique${q ? `?q=${encodeURIComponent(q)}` : ''}" aria-current="${!category}">Tout <span class="n">${total}</span></a>
-      ${categories.map((c) => html`<a class="chip" href="/boutique?categorie=${c.slug}${q ? `&q=${encodeURIComponent(q)}` : ''}" aria-current="${category === c.slug}">${c.name} <span class="n">${c.product_count}</span></a>`)}
+      ${categories.map((c) => html`<a class="chip" href="/boutique?categorie=${c.slug}${qs}" aria-current="${parent?.id === c.id}">${c.name} <span class="n">${c.product_count}</span></a>`)}
     </nav>
+    ${subs.length ? html`<nav class="chips chips-sub" aria-label="Sous-rayons de ${parent.name}">
+      <a class="chip" href="/boutique?categorie=${parent.slug}${qs}" aria-current="${current === parent}">Tout ${parent.name.toLowerCase()} <span class="n">${parent.product_count}</span></a>
+      ${subs.map((c) => html`<a class="chip" href="/boutique?categorie=${c.slug}${qs}" aria-current="${current?.id === c.id}">${c.name} <span class="n">${c.own_count}</span></a>`)}
+    </nav>` : ''}
   </div>
 </div>
 <div class="wrap" style="padding-bottom:72px" data-results>${results}</div>`;

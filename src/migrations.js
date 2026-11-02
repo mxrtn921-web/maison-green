@@ -49,7 +49,35 @@ function deliverySlots18to2() {
   }
 }
 
-const MIGRATIONS = [['categories_v2', categoriesV2], ['delivery_slots_18_02', deliverySlots18to2]];
+// Rayons à sous-rayons : chaque sous-rayon s'affiche à l'intérieur de son rayon (ex. Alcools › Whisky).
+// Un rayon parent absent est créé seulement si au moins un de ses sous-rayons existe.
+const RAYONS = [
+  { name: 'Alcools', tone: 'butter', children: ['Whisky', 'Vodka', 'Rhum', 'Gin', 'Tequila', 'Cognac & calvados', 'Pastis', 'Liqueurs & apéritifs', 'Champagne & mousseux', 'Vin rouge', 'Vin blanc', 'Vin rosé', 'Bières', 'Canettes alcoolisées'] },
+  { name: 'Boissons', tone: 'butter', children: ['Boissons énergisantes'] },
+  { name: 'Épicerie', tone: 'sand', description: 'Épicerie salée et sucrée, snacks, confiseries, café et thé.', children: ['Épicerie salée', 'Épicerie sucrée', 'Biscuits apéro', 'Snacks salés', 'Confiseries', 'Café & thé', 'Produits frais'] },
+  { name: 'Vape', tone: 'stone', description: 'Puffs, cigarettes électroniques et e-liquides.', children: ['Puffs et cigarettes électroniques', 'E-liquides'] },
+  { name: 'Hygiène & beauté', tone: 'stone', children: ['Hygiène'] },
+  { name: 'Maison', tone: 'stone', description: 'Entretien et animalerie.', children: ['Entretien', 'Animalerie'] },
+];
+function rayonsParents() {
+  const byName = (name) => one('SELECT * FROM categories WHERE name = ?', name);
+  for (const r of RAYONS) {
+    const kids = r.children.map(byName).filter(Boolean);
+    if (!kids.length) continue;
+    let parent = byName(r.name);
+    if (!parent) {
+      let slug = slugify(r.name); let i = 2; while (one('SELECT 1 AS x FROM categories WHERE slug = ?', slug)) slug = `${slugify(r.name)}-${i++}`;
+      const pos = Math.min(...kids.map((k) => k.position));
+      const age = kids.some((k) => k.age_restricted) ? 1 : 0;
+      const notice = kids.find((k) => k.legal_notice)?.legal_notice || '';
+      run('INSERT INTO categories (name, slug, description, tone, position, age_restricted, legal_notice) VALUES (?, ?, ?, ?, ?, ?, ?)', r.name, slug, r.description || '', r.tone, pos, age, notice);
+      parent = byName(r.name);
+    }
+    for (const k of kids) if (k.id !== parent.id) run('UPDATE categories SET parent_id = ? WHERE id = ?', parent.id, k.id);
+  }
+}
+
+const MIGRATIONS = [['categories_v2', categoriesV2], ['delivery_slots_18_02', deliverySlots18to2], ['rayons_parents_v1', rayonsParents]];
 
 export function runMigrations() {
   const done = new Set(getSetting('migrations', []));
