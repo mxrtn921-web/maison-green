@@ -75,7 +75,8 @@ export function productTag(p, { lazy = true } = {}) {
 
 /** Variétés CBD « puissantes » : 3 petites étoiles dorées à côté du nom. */
 const STRONG_CBD = ['gold moroco', 'gold maroco', 'gold maroc', 'harlequin', 'red cherry', 'strawberry', 'lemon aze', 'lemon haze', 'candy melon', 'kaly kush', 'kali kush',
-  'ketama', 'inf gorilla', 'inf apple fritter', 'gelato', '3x filtre', 'amnesia'];
+  'ketama', 'inf gorilla', 'inf apple fritter', 'gelato', '3x filtre', 'amnesia',
+  'filtre', 'og runtz', 'royal kush', 'inf crystal snow'];
 const flat = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 export const isStrongCbd = (p) => {
   const n = flat(p.group_name || p.name);
