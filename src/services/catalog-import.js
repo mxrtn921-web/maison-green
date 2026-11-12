@@ -3,7 +3,7 @@
 import { one, all, run, tx, nowIso } from '../db.js';
 import { v, slugify } from '../lib/validate.js';
 
-export const COLUMNS = ['nom', 'rayon', 'prix', 'format', 'stock', 'origine', 'description', 'vedette', 'en_ligne', 'max_par_commande', 'ancien_nom'];
+export const COLUMNS = ['nom', 'rayon', 'prix', 'format', 'stock', 'origine', 'description', 'vedette', 'en_ligne', 'max_par_commande', 'ancien_nom', 'etoiles'];
 const REQUIRED = ['nom', 'rayon', 'prix'];
 const TONES = ['sage', 'sky', 'sand', 'blush', 'butter', 'stone'];
 
@@ -20,6 +20,7 @@ const ALIASES = {
   en_ligne: ['en ligne', 'en_ligne', 'visible', 'actif', 'disponible'],
   max_par_commande: ['max par commande', 'max_par_commande', 'maximum', 'max'],
   ancien_nom: ['ancien nom', 'ancien_nom', 'nom actuel', 'nom existant'],
+  etoiles: ['etoiles', 'stars', '3 etoiles'],
 };
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[_\s]+/g, ' ').trim();
 
@@ -88,7 +89,7 @@ export function analyse(buf) {
       stock: stockValue === null && oldName ? null : stockValue ?? 0,
       max_per_order: maxPer === null && oldName ? null : maxPer ?? 20,
       origin: !originValue && oldName ? null : originValue, description: !descriptionValue && oldName ? null : descriptionValue,
-      is_featured: yes(get('vedette'), oldName ? null : false), is_active: yes(get('en_ligne'), oldName ? null : true) });
+      is_featured: yes(get('vedette'), oldName ? null : false), is_active: yes(get('en_ligne'), oldName ? null : true), stars: yes(get('etoiles'), oldName ? null : false) });
   });
   if (!products.length && !errors.length) errors.push('Aucun produit trouvé sous la ligne de titres.');
   return { products, errors, warnings };
@@ -123,7 +124,7 @@ export function apply(products, { mode = 'maj' } = {}) {
       run('UPDATE categories SET is_active = 1 WHERE id = ?', id);
       return id;
     };
-    const existing = all('SELECT id, name, unit, image_url, slug, description, origin, stock, max_per_order, is_active, is_featured FROM products WHERE deleted_at IS NULL');
+    const existing = all('SELECT id, name, unit, image_url, slug, description, origin, stock, max_per_order, is_active, is_featured, stars FROM products WHERE deleted_at IS NULL');
     const byKey = new Map(existing.map((p) => [norm(p.name) + '|' + norm(p.unit), p]));
     const byName = new Map(); for (const p of existing) { const k = norm(p.name); byName.set(k, byName.has(k) ? null : p); }
     const kept = new Set();
@@ -135,14 +136,14 @@ export function apply(products, { mode = 'maj' } = {}) {
       if (found && !kept.has(found.id)) {
         const slug = norm(found.name) === norm(p.name) ? found.slug : uniqueSlug(p.name, found.id);
         run(`UPDATE products SET category_id = ?, name = ?, slug = ?, description = ?, origin = ?, price_cents = ?, unit = ?, stock = ?, max_per_order = ?,
-             is_active = ?, is_featured = ?, updated_at = ? WHERE id = ?`, cid, p.name, slug, p.description ?? found.description, p.origin ?? found.origin, p.price, p.unit,
+             is_active = ?, is_featured = ?, stars = ?, updated_at = ? WHERE id = ?`, cid, p.name, slug, p.description ?? found.description, p.origin ?? found.origin, p.price, p.unit,
         p.stock ?? found.stock, p.max_per_order ?? found.max_per_order, p.is_active === null ? found.is_active : (p.is_active ? 1 : 0),
-        p.is_featured === null ? found.is_featured : (p.is_featured ? 1 : 0), nowIso(), found.id);
+        p.is_featured === null ? found.is_featured : (p.is_featured ? 1 : 0), p.stars === null ? found.stars : (p.stars ? 1 : 0), nowIso(), found.id);
         kept.add(found.id); stats.updated++;
       } else {
-        const r = run(`INSERT INTO products (category_id, name, slug, description, origin, price_cents, unit, stock, max_per_order, is_active, is_featured)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, cid, p.name, uniqueSlug(p.name), p.description ?? '', p.origin ?? '', p.price, p.unit,
-        p.stock ?? 0, p.max_per_order ?? 20, p.is_active === null ? 1 : (p.is_active ? 1 : 0), p.is_featured === null ? 0 : (p.is_featured ? 1 : 0));
+        const r = run(`INSERT INTO products (category_id, name, slug, description, origin, price_cents, unit, stock, max_per_order, is_active, is_featured, stars)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, cid, p.name, uniqueSlug(p.name), p.description ?? '', p.origin ?? '', p.price, p.unit,
+        p.stock ?? 0, p.max_per_order ?? 20, p.is_active === null ? 1 : (p.is_active ? 1 : 0), p.is_featured === null ? 0 : (p.is_featured ? 1 : 0), p.stars ? 1 : 0);
         kept.add(Number(r.lastInsertRowid)); stats.created++;
       }
     }

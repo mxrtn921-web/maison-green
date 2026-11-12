@@ -278,7 +278,7 @@ const productSchema = {
   name: v.text({ label: 'Le nom', min: 2, max: 120 }), price: v.money(), unit: v.text({ label: 'Le format', max: 40 }),
   stock: v.int({ label: 'Le stock', max: 99999 }), max_per_order: v.int({ label: 'Le maximum', min: 1, max: 999 }),
   category_id: v.int({ label: 'La catégorie', min: 1 }), origin: v.text({ required: false, max: 80 }),
-  description: v.longText({ label: 'La description', max: 1500 }), is_active: v.bool(), is_featured: v.bool(),
+  description: v.longText({ label: 'La description', max: 1500 }), is_active: v.bool(), is_featured: v.bool(), stars: v.bool(),
 };
 
 /** Enregistre une photo après vérification de son vrai format (signature binaire), jamais sur la seule extension. */
@@ -331,9 +331,9 @@ post('/admin/produits/nouveau', (ctx) => {
   if (!ok) return back(errors);
   let image = null;
   try { image = saveImage(ctx.files.image); } catch (e) { return back(e.errors || { image: e.message }); }
-  const r = run(`INSERT INTO products (category_id, name, slug, description, origin, price_cents, unit, stock, max_per_order, image_url, is_active, is_featured)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, data.category_id, data.name, uniqueSlug(data.name), data.description, data.origin, data.price, data.unit,
-    data.stock, data.max_per_order, image, data.is_active ? 1 : 0, data.is_featured ? 1 : 0);
+  const r = run(`INSERT INTO products (category_id, name, slug, description, origin, price_cents, unit, stock, max_per_order, image_url, is_active, is_featured, stars)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, data.category_id, data.name, uniqueSlug(data.name), data.description, data.origin, data.price, data.unit,
+    data.stock, data.max_per_order, image, data.is_active ? 1 : 0, data.is_featured ? 1 : 0, data.stars ? 1 : 0);
   setFlash(ctx.res, 'success', `« ${data.name} » est en ligne.`);
   redirect(ctx.res, `/admin/produits/${r.lastInsertRowid}`);
 });
@@ -358,8 +358,8 @@ post('/admin/produits/:id', async (ctx) => {
     if (uploaded) { removeImage(p.image_url); image = uploaded; } else if (ctx.body.remove_image) { removeImage(p.image_url); image = null; }
   } catch (e) { return back(e.errors || { image: e.message }); }
   run(`UPDATE products SET category_id = ?, name = ?, slug = ?, description = ?, origin = ?, price_cents = ?, unit = ?, stock = ?, max_per_order = ?, image_url = ?,
-       is_active = ?, is_featured = ?, updated_at = ? WHERE id = ?`, data.category_id, data.name, p.name === data.name ? p.slug : uniqueSlug(data.name, p.id),
-  data.description, data.origin, data.price, data.unit, data.stock, data.max_per_order, image, data.is_active ? 1 : 0, data.is_featured ? 1 : 0, nowIso(), p.id);
+       is_active = ?, is_featured = ?, stars = ?, updated_at = ? WHERE id = ?`, data.category_id, data.name, p.name === data.name ? p.slug : uniqueSlug(data.name, p.id),
+  data.description, data.origin, data.price, data.unit, data.stock, data.max_per_order, image, data.is_active ? 1 : 0, data.is_featured ? 1 : 0, data.stars ? 1 : 0, nowIso(), p.id);
   setFlash(ctx.res, 'success', 'Produit enregistré.');
   redirect(ctx.res, `/admin/produits/${p.id}`);
 });

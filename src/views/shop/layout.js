@@ -1,5 +1,5 @@
 import { html, raw } from '../../lib/html.js';
-import { doc, logo, icon, flashBox } from '../ui.js';
+import { doc, logo, icon, flashBox, ASSET_V } from '../ui.js';
 import { hoursSummary } from '../../services/delivery.js';
 import { getSetting } from '../../db.js';
 import { shopInfo } from '../../lib/shop.js';
@@ -37,39 +37,44 @@ ${flashBox(ctx.flash)}
 <main id="contenu">${body}</main>
 <footer class="site-footer">
   <div class="wrap">
-    <div class="footer-top">
-      <div class="footer-brand">
-        ${logo()}
-        <p>L'épicerie de quartier, sélectionnée au comptoir et livrée par notre équipe dans tout Rouen.</p>
+    <div class="sg-foot-top">
+      <div class="sg-foot-call">
+        <h2>Une envie ?<br>On arrive.</h2>
+        <p>Snacks, boissons, CBD et tout le reste. On prépare au comptoir et on livre dans tout Rouen, tous les soirs.</p>
+        <a class="btn btn-lg" href="/boutique">Commander ${icon('arrow')}</a>
       </div>
-      <div class="footer-col">
-        <h4>Boutique</h4>
-        <ul>
-          <li>${shop.address}</li>
-          <li>${shop.postal} ${shop.city}</li>
-          ${shop.phone ? html`<li><a href="${shop.tel}">${shop.phone}</a></li>` : ''}
-          <li><a href="mailto:${shop.email}">${shop.email}</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>Horaires</h4>
-        <ul>${hoursSummary().map((h) => html`<li><span class="muted" style="color:#a9bcb1">${h.day.slice(0, 3)}.</span> ${h.label}</li>`)}</ul>
-      </div>
-      <div class="footer-col">
-        <h4>Informations</h4>
-        <ul>
-          <li><a href="/boutique">Tous les produits</a></li>
-          <li><a href="/#livraison">Zones et délais</a></li>
-          <li><a href="/cgv">Conditions de vente</a></li>
-          <li><a href="/cgu">Conditions d'utilisation</a></li>
-          <li><a href="/confidentialite">Confidentialité</a></li>
-          <li><a href="/mentions-legales">Mentions légales</a></li>
-        </ul>
+      <div class="sg-foot-links">
+        <div>
+          <h4>Le shop</h4>
+          <ul>
+            <li>${shop.address}</li>
+            <li>${shop.postal} ${shop.city}</li>
+            ${shop.phone ? html`<li><a href="${shop.tel}">${shop.phone}</a></li>` : ''}
+            <li><a href="mailto:${shop.email}">${shop.email}</a></li>
+          </ul>
+          <h4 style="margin-top:28px">Horaires</h4>
+          <ul>${hoursSummary().map((h) => html`<li>${h.day.slice(0, 3)}. ${h.label}</li>`)}</ul>
+        </div>
+        <div>
+          <h4>Infos</h4>
+          <ul>
+            <li><a href="/boutique">Tous les produits</a></li>
+            <li><a href="/#livraison">Zones et délais</a></li>
+            <li><a href="${accountHref}">${accountLabel}</a></li>
+            <li><a href="/cgv">Conditions de vente</a></li>
+            <li><a href="/cgu">Conditions d'utilisation</a></li>
+            <li><a href="/confidentialite">Confidentialité</a></li>
+            <li><a href="/mentions-legales">Mentions légales</a></li>
+          </ul>
+        </div>
       </div>
     </div>
+  </div>
+  <p class="sg-foot-word" aria-hidden="true">Maison Green</p>
+  <div class="wrap">
     <div class="footer-bottom">
       <span>© ${new Date().getFullYear()} Maison Green · Rouen</span>
-      <span>Paiement sécurisé par carte bancaire (Stripe)</span>
+      <span>Paiement sécurisé par carte (Stripe) · Vente d'alcool et de CBD réservée aux majeurs</span>
     </div>
   </div>
 </footer>
@@ -80,5 +85,8 @@ ${hideCartBar ? '' : html`<div class="cart-bar" data-cart-bar><button type="butt
   <div class="drawer-body" data-cart-body></div>
   <div class="drawer-foot" data-cart-foot></div>
 </aside>`;
-  return doc({ title, description, body: bodyHtml, robots });
+  const head = html`<link rel="preload" href="/fonts/Anton-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/street.css?v=${ASSET_V}">
+<script src="/js/street.js?v=${ASSET_V}" defer></script>`;
+  return doc({ title, description, body: bodyHtml, robots, bodyClass: 'street', head });
 }

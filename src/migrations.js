@@ -76,7 +76,20 @@ function rayonsParents() {
   }
 }
 
-const MIGRATIONS = [['categories_v2', categoriesV2], ['delivery_slots_18_02', deliverySlots18to2], ['rayons_parents_v1', rayonsParents]];
+// Étoiles ★★★ : jusqu'ici une liste dans le code, désormais une case « 3 étoiles » sur chaque produit.
+const STAR_NAMES = ['gold moroco', 'gold maroco', 'gold maroc', 'harlequin', 'red cherry', 'strawberry', 'lemon aze', 'lemon haze', 'candy melon', 'kaly kush', 'kali kush',
+  'ketama', 'inf gorilla', 'inf apple fritter', 'gelato', '3x filtre', 'filtre', 'og runtz', 'royal kush', 'inf crystal snow', 'static',
+  'emerald queen', 'carbon fiber', 'diamond og', 'jelly cookie', 'inf ice cream'];
+function starsColumn() {
+  const flat = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const rows = all(`SELECT p.id, p.name, c.name AS cat FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.deleted_at IS NULL`);
+  for (const p of rows) {
+    const base = flat(String(p.name).split(/\s+[—–-]\s+/)[0]);
+    if (flat(p.cat).includes('cbd') && STAR_NAMES.some((k) => base === k || base.startsWith(k + ' '))) run('UPDATE products SET stars = 1 WHERE id = ?', p.id);
+  }
+}
+
+const MIGRATIONS = [['categories_v2', categoriesV2], ['delivery_slots_18_02', deliverySlots18to2], ['rayons_parents_v1', rayonsParents], ['cbd_stars_v1', starsColumn]];
 
 export function runMigrations() {
   const done = new Set(getSetting('migrations', []));

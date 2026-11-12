@@ -261,7 +261,7 @@ test('offre de bienvenue, pourboire, avis après livraison et fiche client', asy
   const c = client(); const admin = client();
   await admin.login('admin@maisongreen.fr', 'MaisonGreen-2026');
   const email = `avis${Date.now()}@exemple.fr`;
-  assert.match((await c.get('/')).text, /Votre première livraison est offerte/);
+  assert.match((await c.get('/')).text, /1re livraison offerte/);
   const signup = await c.post('/inscription', { form: { first_name: 'Lina', last_name: 'Test', email, phone: '', password: 'motdepasse-solide', accept: 'on' } });
   assert.equal(signup.status, 303);
   const quote = (items = [{ id: 1, qty: 1 }]) => c.post('/api/cart/quote', { json: { items, postal_code: '76000' } });
@@ -598,7 +598,7 @@ test('qualité du site : CGU, sitemap, robots, compression, favicon, anti-spam, 
   const css = await fetch(BASE + cssUrl, { headers: { 'Accept-Encoding': 'gzip' } });
   assert.equal(css.headers.get('content-encoding'), 'gzip'); assert.match(css.headers.get('cache-control'), /immutable/);
   // un seul bouton principal en haut de l'accueil
-  const hero = /<div class="hero-cta">([\s\S]*?)<\/div>/.exec((await c.get('/')).text)[1];
+  const hero = /<div class="sg-hero-cta">([\s\S]*?)<\/div>/.exec((await c.get('/')).text)[1];
   assert.equal((hero.match(/class="btn /g) || []).length, 1);
   // anti-spam : champ piège présent et bloquant
   assert.match((await c.get('/commande')).text, /name="website"/);

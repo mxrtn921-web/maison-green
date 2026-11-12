@@ -346,6 +346,7 @@ export function productFormPage(ctx, { product = {}, categories, errors = {}, is
         <div class="row wrap-row" style="gap:28px">
           <label class="switch"><input type="checkbox" name="is_active" ${chk(p.is_active ?? 1)}> Disponible à la vente</label>
           <label class="switch"><input type="checkbox" name="is_featured" ${chk(p.is_featured)}> Mis en avant sur l'accueil</label>
+          <label class="switch" title="Affiche ★★★ à côté du nom dans la boutique"><input type="checkbox" name="stars" ${chk(p.stars)}> 3 étoiles ★★★</label>
         </div>
       </div></section>
       <section class="panel"><div class="panel-body image-drop">

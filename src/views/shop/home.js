@@ -3,112 +3,116 @@ import { icon, productCard, productTag } from '../ui.js';
 import { shopLayout } from './layout.js';
 import { parisNow } from '../../lib/time.js';
 
+/** Titre géant : chaque lettre monte à son tour (0,05 s d'écart). */
+const bigWord = (lines) => {
+  let i = 0;
+  return lines.map((word) => html`<span class="hl">${[...word].map((ch) => html`<span class="ch" style="--i:${i++}">${ch}</span>`)}</span>`);
+};
+
 export function homePage(ctx, { categories, featured, zones, hours, state, shelf }) {
   const todayWd = parisNow().weekday;
   const minFee = zones.length ? Math.min(...zones.map((z) => z.fee_cents)) : 0;
   const minEta = zones.length ? Math.min(...zones.map((z) => z.eta_minutes)) : 45;
   const showSignupOffer = !ctx.user || ctx.user.role !== 'customer';
+  const floats = shelf.filter((p) => p.image_url).slice(0, 3);
+  const ticker = ['Snacks', 'Boissons', 'CBD', 'Alcool', 'Épicerie', 'Livré tous les soirs', 'Rouen', 'Jusqu’à 2h'];
 
   const body = html`
-${showSignupOffer ? html`<aside class="welcome-offer" aria-label="Offre de bienvenue">
-  <div class="wrap"><span class="welcome-offer-copy"><strong>Votre première livraison est offerte</strong><span>en créant votre compte</span></span><a href="/inscription" class="welcome-offer-link">Créer un compte ${icon('arrow')}</a></div>
-</aside>` : ''}
-<section class="hero">
-  <div class="wrap hero-grid">
-    <div class="hero-copy">
-      <h1 class="display">Votre épicerie de quartier, <em>livrée</em> à votre porte.</h1>
-      <p class="lede">Épicerie fine, cafés, douceurs et boissons : tout ce qu'il faut pour le quotidien et l'apéro, livré dans tout Rouen par notre équipe.</p>
-      <div class="hero-cta">
-        <a class="btn btn-primary btn-lg" href="/boutique">Commander maintenant <span class="arrow">${icon('arrow')}</span></a>
-        <a class="hero-link" href="#livraison">Voir les zones de livraison</a>
-      </div>
-      <div class="hero-meta">
-        <span>${icon('clock')}${state.accepting ? html`Prochain créneau : ${state.nextSlot.dayLabel.toLowerCase()}, ${state.nextSlot.label}` : 'Commandes momentanément fermées'}</span>
-        <span>${icon('bike')}Livraison dès ${money(minFee)}</span>
-        <span>${icon('card')}Paiement par carte</span>
-      </div>
-    </div>
-    <div class="shelf" aria-hidden="true">
-      ${shelf.map((p) => productTag(p, { lazy: false }))}
-    </div>
-  </div>
-</section>
-
-<section class="section" id="rayons" aria-labelledby="rayons-title">
-  <div class="wrap">
-    <div class="section-head">
-      <div><h2 class="h2" id="rayons-title">Les rayons</h2><p>Une sélection courte et soignée, renouvelée au fil des saisons.</p></div>
-      <a class="link hide-sm" href="/boutique">Tout voir</a>
-    </div>
-    <div class="cat-rail">
-      ${categories.map((c) => html`<a class="cat-tile tone-${c.tone}" href="/boutique?categorie=${c.slug}">
-        <span class="cat-name">${c.name}</span>
-        <span class="cat-count">${c.product_count} produit${c.product_count > 1 ? 's' : ''} ${icon('arrow')}</span>
-      </a>`)}
-    </div>
-  </div>
-</section>
-
-<section class="section" aria-labelledby="pop-title">
-  <div class="wrap">
-    <div class="section-head">
-      <div><h2 class="h2" id="pop-title">Les incontournables</h2><p>Ce que nos voisins commandent le plus souvent.</p></div>
-      <a class="link" href="/boutique">Toute la boutique</a>
-    </div>
-    <div class="product-grid">${featured.map(productCard)}</div>
-  </div>
-</section>
-
-<section class="section alt" aria-labelledby="how-title">
-  <div class="wrap">
-    <div class="section-head"><div><h2 class="h2" id="how-title">Comment ça marche</h2><p>Quatre étapes, et vos courses sont sur la table.</p></div></div>
-    <div class="steps">
-      <div class="step"><span class="step-n">01</span><h3>Composez votre panier</h3><p>Parcourez les rayons, ajoutez vos produits. Les prix et le stock sont à jour en temps réel.</p></div>
-      <div class="step"><span class="step-n">02</span><h3>Choisissez un créneau</h3><p>Indiquez votre adresse et l'heure qui vous arrange, aujourd'hui ou dans les jours qui viennent.</p></div>
-      <div class="step"><span class="step-n">03</span><h3>Nous préparons</h3><p>Votre commande est préparée à la main en boutique, produit par produit.</p></div>
-      <div class="step"><span class="step-n">04</span><h3>On sonne chez vous</h3><p>Un livreur Maison Green vous apporte vos courses. Suivez-le en direct depuis votre téléphone.</p></div>
-    </div>
-  </div>
-</section>
-
-<section class="section" id="livraison" aria-labelledby="zones-title">
-  <div class="wrap zones-grid">
+<section class="sg-hero" aria-labelledby="hero-title">
+  ${floats.map((p, i) => html`<div class="sg-float f${i + 1}" data-parallax aria-hidden="true">${productTag(p, { lazy: false })}</div>`)}
+  <span class="sg-sticker s1" aria-hidden="true">Livré jusqu’à 2h</span>
+  ${showSignupOffer ? html`<a class="sg-sticker s2" href="/inscription">1re livraison offerte</a>` : html`<span class="sg-sticker s2" aria-hidden="true">Rouen ✦ 76</span>`}
+  <h1 class="sg-hero-title" id="hero-title" aria-label="Maison Green">${bigWord(['Maison', 'Green'])}</h1>
+  <div class="wrap sg-hero-foot">
     <div>
-      <div class="section-head"><div><h2 class="h2" id="zones-title">Zones et délais</h2><p>Nous livrons Rouen et sa première couronne. Comptez environ ${minEta} minutes une fois votre créneau commencé.</p></div></div>
-      <div class="zone-list">
-        ${zones.map((z) => html`<div class="zone-row">
-          <span class="zone-name">${z.name}</span><span class="zone-fee">${z.fee_cents ? money(z.fee_cents) : 'Offerte'}</span>
-          <span class="zone-codes">${z.postal_codes.split(',').map((s) => s.trim()).join(' · ')}</span>
-          <span class="zone-min">Sans minimum de commande${z.free_over_cents ? ` · offerte dès ${money(z.free_over_cents)}` : ''}</span>
-        </div>`)}
-      </div>
+      <span class="kicker">Le shop de nuit — Rouen</span>
+      <p>Snacks du monde, boissons fraîches, CBD et l’essentiel de l’épicerie. Tu commandes, on prépare au comptoir et on te livre le soir même.</p>
     </div>
-    <div>
-      <div class="checker">
-        <h3 class="h3">Livrez-vous chez moi ?</h3>
-        <p class="muted small mt-8">Saisissez votre code postal pour connaître vos frais de livraison.</p>
-        <form data-zone-check action="/boutique" method="get">
-          <label class="sr-only" for="zc">Code postal</label>
-          <input class="input" id="zc" name="cp" inputmode="numeric" autocomplete="postal-code" maxlength="5" placeholder="76000" pattern="[0-9]{5}">
-          <button class="btn btn-dark" type="submit">Vérifier</button>
-        </form>
-        <p class="checker-result" data-zone-result aria-live="polite"></p>
+    <div class="sg-hero-meta">
+      <span class="sg-pill">${icon('clock')}${state.accepting ? html`${state.nextSlot.dayLabel} · ${state.nextSlot.label}` : 'Fermé pour le moment'}</span>
+      <span class="sg-pill">${icon('bike')}Livraison dès ${money(minFee)}</span>
+      <span class="sg-pill">${icon('card')}Paiement CB</span>
+    </div>
+    <div class="sg-hero-cta">
+      <a class="btn btn-primary btn-lg" href="/boutique">Commander ${icon('arrow')}</a>
+    </div>
+  </div>
+</section>
+
+<div class="sg-ticker" aria-hidden="true"><div class="sg-ticker-track">${[...ticker, ...ticker, ...ticker, ...ticker].map((t) => html`<span>${t}</span>`)}</div></div>
+
+<section class="sg-block olive first" aria-labelledby="pop-title">
+  <div class="wrap">
+    <div class="sg-head sg-reveal">
+      <h2 class="sg-big" id="pop-title">La sélec’</h2>
+      <a class="sg-round" href="/boutique">Tout voir ${icon('arrow')}</a>
+    </div>
+    <div class="product-grid sg-grid sg-reveal">${featured.map(productCard)}</div>
+  </div>
+</section>
+
+<section class="sg-block cream" id="rayons" aria-labelledby="rayons-title">
+  <div class="wrap">
+    <div class="sg-head sg-reveal"><h2 class="sg-big" id="rayons-title">Les rayons</h2></div>
+    <div class="sg-cats sg-reveal">
+      ${categories.map((c) => html`<a class="sg-cat" href="/boutique?categorie=${c.slug}">${c.name}<small>${c.product_count}</small></a>`)}
+    </div>
+  </div>
+</section>
+
+<section class="sg-block sage" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="sg-head sg-reveal"><h2 class="sg-big" id="how-title">Comment ça marche</h2></div>
+    <div class="sg-steps sg-reveal">
+      <div class="sg-step"><span class="sg-step-n">01</span><h3>Tu remplis ton panier</h3><p>Prix et stock à jour en direct, comme au comptoir.</p></div>
+      <div class="sg-step"><span class="sg-step-n">02</span><h3>Tu choisis ton créneau</h3><p>Ce soir ou un autre jour, à l’heure qui t’arrange.</p></div>
+      <div class="sg-step"><span class="sg-step-n">03</span><h3>On prépare</h3><p>Ta commande est faite à la main au shop, produit par produit.</p></div>
+      <div class="sg-step"><span class="sg-step-n">04</span><h3>On sonne</h3><p>Un livreur de l’équipe te l’apporte. Tu le suis en direct sur ton téléphone.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sg-block forest" id="livraison" aria-labelledby="zones-title">
+  <div class="wrap">
+    <div class="sg-head sg-reveal"><h2 class="sg-big" id="zones-title" style="color:var(--cream)">On livre où ?</h2></div>
+    <div class="zones-grid sg-reveal">
+      <div>
+        <p style="margin-bottom:22px">Rouen et la première couronne. Compte environ ${minEta} minutes une fois ton créneau commencé.</p>
+        <div class="zone-list">
+          ${zones.map((z) => html`<div class="zone-row">
+            <span class="zone-name">${z.name}</span><span class="zone-fee">${z.fee_cents ? money(z.fee_cents) : 'Offerte'}</span>
+            <span class="zone-codes">${z.postal_codes.split(',').map((s) => s.trim()).join(' · ')}</span>
+            <span class="zone-min">Sans minimum${z.free_over_cents ? ` · offerte dès ${money(z.free_over_cents)}` : ''}</span>
+          </div>`)}
+        </div>
       </div>
-      <div class="hours" aria-label="Horaires d'ouverture">
-        ${hours.map((h) => html`<div class="${h.weekday === todayWd ? 'today' : ''}"><span>${h.day}</span><span class="${h.open ? '' : 'muted'}">${h.label}</span></div>`)}
+      <div>
+        <div class="checker">
+          <h3 class="h3">Tu es dans la zone ?</h3>
+          <p class="small mt-8">Tape ton code postal pour voir les frais de livraison.</p>
+          <form data-zone-check action="/boutique" method="get">
+            <label class="sr-only" for="zc">Code postal</label>
+            <input class="input" id="zc" name="cp" inputmode="numeric" autocomplete="postal-code" maxlength="5" placeholder="76000" pattern="[0-9]{5}">
+            <button class="btn btn-dark" type="submit">Vérifier</button>
+          </form>
+          <p class="checker-result" data-zone-result aria-live="polite"></p>
+        </div>
+        <div class="hours" aria-label="Horaires d'ouverture">
+          ${hours.map((h) => html`<div class="${h.weekday === todayWd ? 'today' : ''}"><span>${h.day}</span><span>${h.label}</span></div>`)}
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section" id="maison" aria-labelledby="perks-title">
+<section class="sg-block cream" id="maison" aria-labelledby="perks-title">
   <div class="wrap">
-    <div class="section-head"><div><h2 class="h2" id="perks-title">Pourquoi Maison Green</h2></div></div>
-    <div class="perks">
-      <div class="perk"><div class="rule"></div><h3>Choisi au comptoir</h3><p>Pas d'entrepôt : chaque produit vient de nos rayons, sélectionné auprès de producteurs et de maisons que nous connaissons.</p></div>
-      <div class="perk"><div class="rule"></div><h3>Livré par nous</h3><p>Nos livreurs sont de l'équipe. Ils connaissent le quartier, les digicodes et le troisième étage sans ascenseur.</p></div>
-      <div class="perk"><div class="rule"></div><h3>Paiement sécurisé</h3><p>Réglez par carte bancaire, en toute sécurité grâce à Stripe. Aucun abonnement, aucun frais caché.</p></div>
-      <div class="perk"><div class="rule"></div><h3>Un vrai service de quartier</h3><p>Un produit manquant, une question ? On vous appelle avant de livrer. Et on reprend ce qui ne va pas.</p></div>
+    <div class="sg-head sg-reveal"><h2 class="sg-big" id="perks-title">Pourquoi nous</h2></div>
+    <div class="sg-perks sg-reveal">
+      <div class="sg-perk"><h3>Choisi au comptoir</h3><p>Pas d’entrepôt : tout vient de nos rayons, des snacks importés aux fleurs de CBD.</p></div>
+      <div class="sg-perk"><h3>Livré par l’équipe</h3><p>Nos livreurs connaissent le quartier, les digicodes et le 3e sans ascenseur.</p></div>
+      <div class="sg-perk"><h3>Paiement sécurisé</h3><p>Carte bancaire via Stripe. Pas d’abonnement, pas de frais cachés.</p></div>
+      <div class="sg-perk"><h3>Un vrai shop de quartier</h3><p>Un produit manque ? On t’appelle avant de partir. Et on reprend ce qui ne va pas.</p></div>
     </div>
   </div>
 </section>`;
